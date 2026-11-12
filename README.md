@@ -12,6 +12,12 @@ The project is an independent reimplementation of the feature set of the supplie
 
 Open **<https://piehelmet.github.io/autopulse-obd/>** in Chrome or Edge. Install it from the browser menu (**Install app** / **Add to Home screen**) to run it as a standalone offline app.
 
+### Install the Android APK
+
+Download **[AutoPulse-OBD2-1.0.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.0.0/AutoPulse-OBD2-1.0.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser/file manager when prompted.
+
+The APK is a Trusted Web Activity: it wraps the hosted PWA in a fullscreen Chrome-backed shell, so Web Bluetooth hardware support is preserved. Digital Asset Links are published at <https://piehelmet.github.io/.well-known/assetlinks.json>, so the app runs without browser chrome.
+
 ### Run locally
 
 ```powershell
