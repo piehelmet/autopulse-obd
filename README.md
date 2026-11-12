@@ -10,7 +10,7 @@ The project is an independent reimplementation of the feature set of the supplie
 
 ### Use the hosted app
 
-Open the GitHub Pages URL for this repository in Chrome or Edge. Install it from the browser menu (**Install app** / **Add to Home screen**) to run it as a standalone offline app.
+Open **<https://piehelmet.github.io/autopulse-obd/>** in Chrome or Edge. Install it from the browser menu (**Install app** / **Add to Home screen**) to run it as a standalone offline app.
 
 ### Run locally
 
