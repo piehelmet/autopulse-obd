@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0f14" />
+  <meta name="description" content="AutoPulse OBD2 — live car diagnostics, custom dashboards, DTC scanning, trips, performance tests and service functions." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="AutoPulse" />
+  <title>AutoPulse OBD2</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/icon-180.png" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#/dashboard" aria-label="AutoPulse home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48"><path d="M6 27h7l4-11 6 20 5-14 3 5h11" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="39" cy="27" r="3.2" fill="currentColor"/></svg>
+        </span>
+        <span class="brand-text"><b>AutoPulse</b><small>OBD2 DIAGNOSTICS</small></span>
+      </a>
+
+      <nav class="nav" aria-label="Main">
+        <a href="#/dashboard" data-route="dashboard"><span class="ico" data-icon="gauge"></span><span>Dashboard</span></a>
+        <a href="#/live" data-route="live"><span class="ico" data-icon="pulse"></span><span>Live data</span></a>
+        <a href="#/diagnostics" data-route="diagnostics"><span class="ico" data-icon="alert"></span><span>Diagnostics</span></a>
+        <a href="#/trips" data-route="trips"><span class="ico" data-icon="route"></span><span>Trips</span></a>
+        <a href="#/performance" data-route="performance"><span class="ico" data-icon="flag"></span><span>Performance</span></a>
+        <a href="#/service" data-route="service"><span class="ico" data-icon="wrench"></span><span>Service &amp; coding</span></a>
+        <a href="#/terminal" data-route="terminal"><span class="ico" data-icon="terminal"></span><span>Terminal</span></a>
+        <a href="#/garage" data-route="garage"><span class="ico" data-icon="car"></span><span>Garage</span></a>
+        <a href="#/settings" data-route="settings"><span class="ico" data-icon="cog"></span><span>Settings</span></a>
+      </nav>
+
+      <div class="side-connect">
+        <div class="conn-line">
+          <span class="status-dot" id="sideStatusDot"></span>
+          <span id="sideStatusText">Demo vehicle</span>
+        </div>
+        <div class="conn-sub" id="sideAdapterText">Simulated ELM327 · 1.5</div>
+        <button class="btn btn-primary btn-sm btn-block" id="sideConnectBtn" type="button">Connection setup</button>
+      </div>
+      <div class="side-foot">AutoPulse v1.0 · offline ready</div>
+    </aside>
+
+    <div class="main-wrap">
+      <header class="topbar">
+        <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Open menu">
+          <span class="ico" data-icon="menu"></span>
+        </button>
+        <div class="top-title">
+          <h1 id="pageTitle">Dashboard</h1>
+          <p id="pageSub">Live vehicle telemetry</p>
+        </div>
+        <div class="top-actions">
+          <button class="pill" id="vehiclePill" type="button" title="Active vehicle">
+            <span class="ico" data-icon="car"></span><span id="vehiclePillText">Demo car</span>
+          </button>
+          <button class="pill conn-pill" id="connPill" type="button" title="Connection status">
+            <span class="status-dot" id="topStatusDot"></span><span id="topStatusText">Demo</span>
+          </button>
+          <button class="icon-btn" id="hudBtn" type="button" title="HUD mode" aria-label="HUD mode">
+            <span class="ico" data-icon="hud"></span>
+          </button>
+        </div>
+      </header>
+
+      <main id="view" class="view" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <nav class="mobile-nav" aria-label="Mobile">
+    <a href="#/dashboard" data-route="dashboard"><span class="ico" data-icon="gauge"></span><span>Dash</span></a>
+    <a href="#/live" data-route="live"><span class="ico" data-icon="pulse"></span><span>Live</span></a>
+    <a href="#/diagnostics" data-route="diagnostics"><span class="ico" data-icon="alert"></span><span>DTC</span></a>
+    <a href="#/trips" data-route="trips"><span class="ico" data-icon="route"></span><span>Trips</span></a>
+    <a href="#/settings" data-route="settings"><span class="ico" data-icon="cog"></span><span>More</span></a>
+  </nav>
+
+  <div id="modalRoot"></div>
+  <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+  <div id="hudOverlay" class="hud-overlay" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
