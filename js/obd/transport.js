@@ -1,4 +1,6 @@
-/* AutoPulse OBD2 — Web Serial and Web Bluetooth transports */
+/* AutoPulse OBD2 — Web Serial, Web Bluetooth and native Android BLE transports */
+
+import { isNativeApp, loadNativeBle } from './native-ble.js';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -17,7 +19,33 @@ const BLE_OPTIONAL = [
 ];
 
 export const isSerialSupported = () => 'serial' in navigator;
-export const isBluetoothSupported = () => 'bluetooth' in navigator;
+export const isBluetoothSupported = () => isNativeApp() || 'bluetooth' in navigator;
+
+const bareUuid = (uuid) => {
+  if (typeof uuid === 'number') return uuid.toString(16).padStart(4, '0');
+  return String(uuid || '').toLowerCase().replace(/[^0-9a-f]/g, '');
+};
+const toFullUuid = (uuid) => {
+  const short = bareUuid(uuid);
+  if (short.length === 4) return `0000${short}-0000-1000-8000-00805f9b34fb`;
+  if (short.length === 8) return `${short}-0000-1000-8000-00805f9b34fb`;
+  if (short.length === 32) return `${short.slice(0, 8)}-${short.slice(8, 12)}-${short.slice(12, 16)}-${short.slice(16, 20)}-${short.slice(20)}`;
+  return String(uuid);
+};
+const isKnownService = (uuid) => {
+  const hex = bareUuid(uuid);
+  return BLE_SERVICES.some((known) => {
+    const short = bareUuid(known);
+    return hex === short || (short.length === 4 && hex.includes(short));
+  });
+};
+
+const pickService = (services) => {
+  if (!services?.length) return null;
+  return services.find((s) => isKnownService(s.uuid))
+    || services.find((s) => /ffe0|fff0/.test(bareUuid(s.uuid)))
+    || services[0];
+};
 
 class BaseTransport {
   constructor(name = 'Adapter') {
@@ -157,6 +185,11 @@ export class BleTransport extends BaseTransport {
     this.server = null;
     this.writeChar = null;
     this.notifyChar = null;
+    this.native = null;
+    this.deviceId = null;
+    this.serviceUuid = null;
+    this.writeUuid = null;
+    this.notifyUuid = null;
     this.onChange = (e) => {
       const value = e.target.value;
       if (!value) return;
@@ -165,6 +198,7 @@ export class BleTransport extends BaseTransport {
   }
 
   async connect() {
+    if (isNativeApp()) return this.connectNative();
     if (!isBluetoothSupported()) {
       throw new Error('Web Bluetooth is not supported in this browser. Use Chrome or Edge over HTTPS or localhost.');
     }
@@ -208,7 +242,71 @@ export class BleTransport extends BaseTransport {
     this.connected = true;
   }
 
+  /* Native Android path: talks to the BLE stack through Capacitor, so the app
+   * does not need Chrome, Web Bluetooth or an internet connection. */
+  async connectNative() {
+    const ble = await loadNativeBle();
+    this.native = ble;
+
+    try {
+      await ble.initialize();
+    } catch (err) {
+      throw new Error(`Bluetooth could not start: ${err?.message || err}`);
+    }
+    if (!(await ble.isEnabled())) {
+      try { await ble.requestEnable(); } catch { /* user declined */ }
+      if (!(await ble.isEnabled())) throw new Error('Bluetooth is turned off. Turn Bluetooth on and try again.');
+    }
+
+    let device;
+    try {
+      device = await ble.requestDevice({ optionalServices: BLE_OPTIONAL.map(toFullUuid) });
+    } catch (err) {
+      throw new Error(err?.message || 'No Bluetooth adapter was selected');
+    }
+    this.deviceId = device.deviceId;
+    this.name = device.name || device.localName || 'Bluetooth ELM327';
+
+    await ble.connect(this.deviceId, () => {
+      if (!this.connected) return;
+      this.connected = false;
+      this.push('\nNO DATA\n');
+    });
+
+    const services = await ble.getServices(this.deviceId);
+    const service = pickService(services);
+    if (!service) throw new Error('No usable GATT service found on this device');
+
+    const chars = service.characteristics || [];
+    const notify = chars.find((c) => c.properties?.notify || c.properties?.indicate) || null;
+    const write = chars.find((c) => c.properties?.write || c.properties?.writeWithoutResponse) || notify;
+    if (!write) throw new Error('No writable characteristic found');
+
+    this.serviceUuid = service.uuid;
+    this.writeUuid = write.uuid;
+    this.notifyUuid = notify ? notify.uuid : null;
+
+    if (notify) {
+      await ble.startNotifications(this.deviceId, service.uuid, notify.uuid, (value) => {
+        const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        this.push(decoder.decode(bytes, { stream: true }));
+      });
+    }
+    this.connected = true;
+  }
+
   async write(text) {
+    if (this.native) {
+      if (!this.writeUuid) throw new Error('Bluetooth characteristic is not ready');
+      const bytes = encoder.encode(text);
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      try {
+        await this.native.write(this.deviceId, this.serviceUuid, this.writeUuid, view);
+      } catch {
+        await this.native.writeWithoutResponse(this.deviceId, this.serviceUuid, this.writeUuid, view);
+      }
+      return;
+    }
     if (!this.writeChar) throw new Error('Bluetooth characteristic is not ready');
     const data = encoder.encode(text);
     try {
@@ -220,6 +318,18 @@ export class BleTransport extends BaseTransport {
   }
 
   async disconnect() {
+    if (this.native) {
+      const native = this.native;
+      const id = this.deviceId;
+      this.native = null;
+      this.deviceId = null;
+      this.serviceUuid = null;
+      this.writeUuid = null;
+      this.notifyUuid = null;
+      await super.disconnect();
+      try { await native.disconnect(id); } catch { /* ignore */ }
+      return;
+    }
     await super.disconnect();
     try {
       if (this.notifyChar) {

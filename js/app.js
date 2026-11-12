@@ -152,6 +152,10 @@ const bindInstall = () => {
 const registerServiceWorker = () => {
   if (!('serviceWorker' in navigator)) return;
   if (location.protocol === 'file:') return;
+  // The Android build ships its own copy of the assets, so a service worker
+  // would only add a second cache layer (and Capacitor's local server can
+  // serve stale files). Offline support there comes from the APK itself.
+  if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) return;
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch((err) => {
       console.warn('AutoPulse: service worker registration failed', err);

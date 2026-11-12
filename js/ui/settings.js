@@ -9,6 +9,7 @@ import { icon, hydrateIcons } from '../core/icons.js';
 import { pageHead, modal, toast, confirmDialog } from './components.js';
 import { connection } from '../obd/connection.js';
 import { isSerialSupported, isBluetoothSupported } from '../obd/transport.js';
+import { isNativeApp } from '../obd/native-ble.js';
 import { download, pickFile, escapeHtml } from '../core/utils.js';
 
 export const applyTheme = (theme = 'dark') => {
@@ -158,14 +159,14 @@ export const render = (view) => {
           ${group('About', `
             <div class="settings-row">
               <div class="sr-text">
-                <b>AutoPulse OBD2 v1.0</b>
+                <b>AutoPulse OBD2 v1.1.0</b>
                 <span>Independent offline-capable OBD-II diagnostics PWA. Not affiliated with Car Scanner, ELM Electronics or any vehicle manufacturer.</span>
               </div>
               <div class="sr-control"><span class="chip accent">PWA</span></div>
             </div>
             <div class="settings-row">
-              <div class="sr-text"><b>Browser support</b><span>Chrome or Edge on desktop for Web Serial. Web Bluetooth requires HTTPS or localhost and a compatible BLE adapter. The demo works everywhere.</span></div>
-              <div class="sr-control"><span class="chip info">Web APIs</span></div>
+              <div class="sr-text"><b>${isNativeApp() ? 'Android build' : 'Browser support'}</b><span>${isNativeApp() ? 'Bundled inside the app and fully offline. Bluetooth uses the Android BLE stack directly — Chrome is not involved.' : 'Chrome or Edge on desktop for Web Serial. Web Bluetooth requires HTTPS or localhost and a compatible BLE adapter. The demo works everywhere.'}</span></div>
+              <div class="sr-control"><span class="chip info">${isNativeApp() ? 'Native' : 'Web APIs'}</span></div>
             </div>
             <div class="settings-row">
               <div class="sr-text"><b>Diagnostic scope</b><span>Generic OBD-II (Mode 01, 02, 03, 04, 06, 07, 09, 0A) and user-defined Mode 22 PIDs. Manufacturer coding and some service routines are simulated demo catalogues and do not write to a real vehicle.</span></div>
@@ -346,7 +347,7 @@ export const openConnectionModal = (onChange) => {
           <div class="settings-row">
             <div class="sr-text">
               <b>Bluetooth ELM327</b>
-              <span>${bluetooth ? 'Web Bluetooth is available. Requires HTTPS or localhost and a BLE OBD-II adapter.' : 'Web Bluetooth is not available here. Requires Chrome or Edge over HTTPS or localhost.'}</span>
+              <span>${bluetooth ? (isNativeApp() ? 'Android Bluetooth is available. Scans for BLE ELM327 adapters and connects directly.' : 'Web Bluetooth is available. Requires HTTPS or localhost and a BLE OBD-II adapter.') : 'Web Bluetooth is not available here. Requires Chrome or Edge over HTTPS or localhost.'}</span>
             </div>
             <div class="sr-control">
               <button class="btn btn-sm" id="connBleBtn" type="button" ${bluetooth ? '' : 'disabled'}>${icon('bluetooth')}<span>Connect Bluetooth</span></button>

@@ -14,9 +14,13 @@ Open **<https://piehelmet.github.io/autopulse-obd/>** in Chrome or Edge. Install
 
 ### Install the Android APK
 
-Download **[AutoPulse-OBD2-1.0.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.0.0/AutoPulse-OBD2-1.0.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser/file manager when prompted.
+Download **[AutoPulse-OBD2-1.1.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.1.0/AutoPulse-OBD2-1.1.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser or file manager when prompted.
 
-The APK is a Trusted Web Activity: it wraps the hosted PWA in a fullscreen Chrome-backed shell, so Web Bluetooth hardware support is preserved. Digital Asset Links are published at <https://piehelmet.github.io/.well-known/assetlinks.json>, so the app runs without browser chrome.
+The APK is a self-contained native app. Every asset is bundled inside it, so it works with no internet connection at all — even on first launch. It does **not** use the Chrome app, has no URL bar, and does not depend on GitHub Pages being reachable. Bluetooth ELM327 adapters are reached through the Android Bluetooth LE stack directly.
+
+> Technical note: the UI is rendered by the system Android WebView (Chromium-based), which is a standard Android component — the same engine used by many native apps. The Chrome browser itself is never launched or required.
+
+Requires Android 7.0 (API 24) or newer.
 
 ### Run locally
 
@@ -32,8 +36,15 @@ Open <http://localhost:8080>. Service workers, Web Bluetooth and Web Serial all 
 1. Plug an ELM327-compatible adapter into the OBD-II port.
 2. Turn the ignition on (engine running is recommended for live data).
 3. Open **Connection setup** in the sidebar or top bar.
-4. Choose **Connect USB** (Chrome/Edge desktop) or **Connect Bluetooth** (Chrome/Edge over HTTPS or localhost).
-5. Select the adapter in the browser picker. AutoPulse runs the ELM327 handshake and starts polling.
+4. Choose **Connect USB** (desktop browser) or **Connect Bluetooth**.
+5. Select the adapter in the picker. AutoPulse runs the ELM327 handshake and starts polling.
+
+How the Bluetooth picker appears depends on where you run the app:
+
+| Platform | Bluetooth path |
+| --- | --- |
+| Android APK | Native Android Bluetooth LE scan dialog. Grant the Bluetooth/location permission the first time. |
+| Hosted PWA in Chrome/Edge | Web Bluetooth device chooser (requires HTTPS or localhost). |
 
 > Web Serial is desktop-only. Web Bluetooth requires a BLE adapter and a secure context. Classic Bluetooth ELM327 adapters are not exposed by the Web Bluetooth API.
 
@@ -107,6 +118,13 @@ autopulse-obd/
 - Vanilla ES modules and canvas.
 - State is persisted in `localStorage` under `autopulse.state.v1`.
 - Every screen exports `render(view)` and returns a cleanup function used by the router.
+- `js/obd/native-ble.js` is inert on the web and loads `native-ble.bundle.js` only inside the Android shell.
+
+### Android packaging
+
+The APK is built from a separate Capacitor project that copies this folder into its
+`www/` directory and bundles the native BLE plugin. The web app remains the single
+source of truth: rebuild the APK after changing anything here.
 
 ---
 
