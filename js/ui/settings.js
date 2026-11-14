@@ -170,8 +170,10 @@ export const render = (view) => {
                 <span class="chip info">Library ${escapeHtml(lib.version)}</span>
                 <button class="btn btn-xs" id="setDtcUpdateBtn" type="button">${icon('refresh')}<span>Check for updates</span></button>
               </div>`)}
-            ${row('Module scan (TCM / ABS / airbag)', 'Generic OBD-II reads the engine control module only. Diagnostics → Scan all modules probes the standard 11-bit CAN addresses with UDS or KWP2000. Read-only and experimental: some ELM327 v1.5 clones cannot reassemble multi-frame replies.', `
+            ${row('Module scan (TCM / ABS / airbag / immobilizer)', 'Generic OBD-II reads the engine control module only. Diagnostics → Scan all modules probes the standard 11-bit CAN addresses with UDS or KWP2000. Read-only and experimental: some ELM327 v1.5 clones cannot reassemble multi-frame replies.', `
               <span class="chip warn">Experimental</span>`)}
+            ${row('Immobilizer / Sentry Key', 'The 2008 Grand Caravan preset can request SKREEM/WCM codes on a best-effort address. AutoPulse never programs or clones keys or fobs, reads PIN/SKIM secrets or performs security access. Use a dealer, automotive locksmith or an owner-authorized programmer for key work.', `
+              <span class="chip info">Read-only</span>`)}
           `)}
 
           ${group('About', `
@@ -187,7 +189,7 @@ export const render = (view) => {
               <div class="sr-control"><span class="chip info">${isNativeApp() ? 'Native' : 'Web APIs'}</span></div>
             </div>
             <div class="settings-row">
-              <div class="sr-text"><b>Diagnostic scope</b><span>Generic OBD-II (Mode 01, 02, 03, 04, 06, 07, 09, 0A), user-defined Mode 22 PIDs, and an experimental read-only UDS/KWP module scan. Manufacturer coding and some service routines are simulated demo catalogues and do not write to a real vehicle.</span></div>
+              <div class="sr-text"><b>Diagnostic scope</b><span>Generic OBD-II (Mode 01, 02, 03, 04, 06, 07, 09, 0A), user-defined Mode 22 PIDs, and an experimental read-only UDS/KWP module scan including best-effort immobilizer codes. Key and fob programming, PIN access and security access are not implemented. Manufacturer coding and some service routines are simulated demo catalogues and do not write to a real vehicle.</span></div>
               <div class="sr-control"><span class="chip warn">Demo limits</span></div>
             </div>
             <div class="settings-row">

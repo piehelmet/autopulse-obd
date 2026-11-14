@@ -9,6 +9,9 @@
  * asks each module for its DTCs, and decodes single- and multi-frame ELM327
  * replies. It is deliberately read-only and marked experimental: clone ELM327
  * v1.5 firmware often cannot reassemble multi-frame CAN responses reliably.
+ *
+ * The immobilizer entry (SKREEM/WCM) is opt-in and flagged as best-effort. It
+ * never performs key programming, PIN retrieval or security access.
  */
 
 const CAN_MODULES = [
@@ -28,10 +31,26 @@ const CAN_MODULES = [
     id: 'srs', name: 'Airbag / occupant restraint', short: 'SRS', dtcModule: 'SRS',
     request: '7E3', response: '7EB',
   },
+  {
+    // Read-only Sentry Key / SKREEM diagnostics. The 7E4 request pair is a
+    // best-effort candidate: Chrysler CAN layouts vary, and 7E4 carries other
+    // modules on some makes, so this entry is opt-in per preset.
+    id: 'immobilizer', name: 'Immobilizer / Sentry Key (SKREEM)', short: 'SKREEM', dtcModule: 'IMMO',
+    request: '7E4', response: '7EC',
+    defaultEnabled: false,
+    bestEffort: true,
+    capabilityNote: 'Read-only immobilizer codes. Key and fob programming, PIN access, security access and module pairing are not supported.',
+  },
 ];
 
 const cloneModules = (overrides = {}) =>
-  CAN_MODULES.map((module) => ({ ...module, ...(overrides[module.id] || {}) }));
+  CAN_MODULES.flatMap((module) => {
+    const override = overrides[module.id] || {};
+    const enabled = override.enabled ?? module.defaultEnabled !== false;
+    if (!enabled) return [];
+    const { enabled: _enabled, ...rest } = override;
+    return [{ ...module, ...rest }];
+  });
 
 export const MODULE_PRESETS = {
   'toyota-camry-2011': {
@@ -58,6 +77,11 @@ export const MODULE_PRESETS = {
       tcm: { name: 'Transmission control module (62TE)' },
       abs: { name: 'ABS / ESP' },
       srs: { name: 'Occupant restraint controller (ORC)' },
+      immobilizer: {
+        enabled: true,
+        name: 'Wireless control module / SKREEM (Sentry Key)',
+        capabilityNote: 'Read-only SKREEM/Sentry Key codes. Key and fob programming, PIN access, security access and module pairing are not supported. The 7E4 → 7EC address is a best-effort candidate and may not answer on every build.',
+      },
     }),
   },
 };

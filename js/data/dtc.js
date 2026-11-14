@@ -140,6 +140,9 @@ export const DTC_DATABASE = [
   d('P0507', 'Idle control system RPM higher than expected', 'Powertrain', 'low',
     ['Vacuum leak', 'Throttle body contamination', 'IAC valve fault'],
     ['High idle']),
+  d('P0513', 'Incorrect immobilizer key (key not accepted by the security module)', 'Powertrain', 'high',
+    ['Unprogrammed or invalid transponder key', 'Key or fob transponder fault', 'Immobilizer / security module mismatch', 'Security module power or communication fault'],
+    ['No crank or no start', 'Security indicator flashing', 'Engine starts then stalls', 'MIL on']),
   d('P0521', 'Engine oil pressure sensor range / performance', 'Powertrain', 'medium',
     ['Faulty oil pressure sensor', 'Low oil level', 'Wiring fault'],
     ['Oil pressure warning', 'MIL on']),
@@ -161,6 +164,9 @@ export const DTC_DATABASE = [
   d('P0606', 'PCM / ECM processor fault', 'Powertrain', 'high',
     ['Internal PCM failure', 'Power supply issue', 'Ground fault'],
     ['No start', 'Limp mode', 'Multiple warnings']),
+  d('P0633', 'Immobilizer key not programmed (secret key not stored in PCM)', 'Powertrain', 'high',
+    ['PCM replacement or reflash without immobilizer learn', 'Security module to PCM handshake failure', 'Unprogrammed key', 'PCM or security module fault'],
+    ['No start', 'Engine starts then stalls', 'Security indicator flashing', 'MIL on']),
   d('P0700', 'Transmission control system (MIL request)', 'Transmission', 'medium',
     ['Stored TCM code', 'Transmission fault', 'Wiring issue'],
     ['MIL on', 'Harsh shifts']),
@@ -233,6 +239,9 @@ export const DTC_DATABASE = [
   d('U0155', 'Lost communication with instrument panel cluster', 'Network', 'medium',
     ['CAN bus fault', 'Cluster power/ground', 'Module failure'],
     ['Dead instrument cluster']),
+  d('U0168', 'Lost communication with vehicle security control module', 'Network', 'high',
+    ['CAN bus fault', 'Security module power or ground fault', 'Security module failure', 'Open or shorted wiring'],
+    ['No start', 'Security indicator flashing', 'Multiple module warnings', 'MIL on']),
   d('U0401', 'Invalid data received from ECM / PCM', 'Network', 'medium',
     ['Software mismatch', 'CAN fault', 'Module fault'],
     ['Multiple warnings', 'Limp mode']),
@@ -276,7 +285,7 @@ export const DTC_MAP = Object.fromEntries(DTC_DATABASE.map((x) => [x.code, x]));
 /* Built-in library version. Bump when DTC_DATABASE changes, and publish a
  * matching data/dtc-pack.json so installed apps can pull newer descriptions
  * without waiting for a full app update. */
-export const DTC_LIBRARY_VERSION = '2026.11.2';
+export const DTC_LIBRARY_VERSION = '2026.11.3';
 
 const PACK_KEY = 'autopulse.dtcPack.v1';
 const CODE_RE = /^[PCBU][0-9A-F]{4}$/;

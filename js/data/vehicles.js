@@ -13,7 +13,7 @@ export const VEHICLE_PRESETS = [
     make: 'Dodge', model: 'Grand Caravan 4.0', year: 2008, fuel: 'Gasoline', tank: 76,
     vin: '', engine: '4.0L V6', transmission: '62TE 6-speed automatic',
     modulePreset: 'dodge-caravan-2008',
-    notes: '62TE transmission. Module scan probes the standard 7E1 → 7E9 TCM pair.',
+    notes: '62TE transmission. Module scan probes the standard 7E1 → 7E9 TCM pair plus a best-effort 7E4 → 7EC SKREEM/WCM address for read-only Sentry Key codes.',
   },
   {
     label: 'Volkswagen Golf 1.4 TSI (2021)',

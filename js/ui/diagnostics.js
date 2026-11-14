@@ -244,7 +244,7 @@ const codesPanel = (dtcs) => {
   const vehicle = activeVehicle();
   const libraryNote = `
     <div class="callout" style="margin-top:6px">${icon('info')}<div>
-      <b>Generic scan reads the ECM/PCM only.</b> Use <b>Scan all modules</b> for direct TCM, ABS and airbag reads over UDS/KWP2000. That scan is experimental and depends on the adapter and vehicle.
+      <b>Generic scan reads the ECM/PCM only.</b> Use <b>Scan all modules</b> for direct TCM, ABS, airbag and (where mapped) immobilizer reads over UDS/KWP2000. That scan is experimental, read-only and depends on the adapter and vehicle.
       <div class="small muted" style="margin-top:4px">Code library ${escapeHtml(lib.version)} · ${lib.builtIn} built-in${lib.downloaded ? ` + ${lib.downloaded} downloaded (${escapeHtml(lib.packVersion || 'pack')})` : ''} descriptions.</div>
     </div></div>`;
 
@@ -299,7 +299,7 @@ const moduleCard = (module, context) => {
       ? `<span class="chip danger">${dtcs.length} code${dtcs.length === 1 ? '' : 's'}</span>`
       : '<span class="chip ok">No codes</span>';
   const proto = module.present ? protocolLabel(module.protocol) : '—';
-  const meta = `${proto} · ${module.request} → ${module.response}${module.note ? ` · ${module.note}` : ''}`;
+  const meta = `${proto} · ${module.request} → ${module.response}${module.bestEffort ? ' · best-effort address' : ''}${module.note ? ` · ${module.note}` : ''}`;
 
   return `
     <div class="settings-group">
@@ -313,6 +313,7 @@ const moduleCard = (module, context) => {
         </div>
         <div class="sr-control">${stateChip}</div>
       </div>
+      ${module.capabilityNote ? `<div class="small muted row" style="align-items:flex-start;gap:6px;padding:0 12px 12px">${icon('shield', 'tiny')}<span>${escapeHtml(module.capabilityNote)}</span></div>` : ''}
       ${dtcs.length ? `<div class="stack" style="padding:0 12px 12px">
         ${dtcs.map((dtc) => {
           const info = lookupDtc(dtc.code, {
@@ -343,13 +344,13 @@ const moduleCard = (module, context) => {
 
 const modulesPanel = (result) => {
   if (scanningModules) {
-    return `<div style="padding:18px">${spinner('Addressing ECM, TCM, ABS and SRS modules…')}</div>`;
+    return `<div style="padding:18px">${spinner('Addressing the vehicle modules…')}</div>`;
   }
   if (!result) {
     return emptyState(
       'grid',
       'No module scan yet',
-      'Generic OBD-II reads the engine module only. A module scan directly addresses the TCM, ABS and airbag controllers over CAN using UDS or KWP2000.',
+      'Generic OBD-II reads the engine module only. A module scan directly addresses the TCM, ABS, airbag and (where mapped) immobilizer controllers over CAN using UDS or KWP2000.',
       '<button class="btn btn-primary btn-sm" id="moduleScanEmpty" type="button">Scan all modules</button>',
     );
   }
@@ -373,6 +374,9 @@ const modulesPanel = (result) => {
     <div class="stack" style="gap:12px">
       ${modules.map((module) => moduleCard(module, context)).join('')}
     </div>
+    ${modules.some((module) => module.id === 'immobilizer') ? `<div class="callout warn" style="margin-top:14px">${icon('shield')}<div>
+      <b>Immobilizer and Sentry Key diagnostics are read-only.</b> AutoPulse does not program or clone keys or fobs, retrieve PIN/SKIM secrets, perform security access or pair modules. A missing or rejected key needs a dealer, automotive locksmith or an owner-authorized programmer.
+    </div></div>` : ''}
     <div class="callout" style="margin-top:14px">${icon('info')}<div>Module codes are not cleared by the generic <b>Clear codes</b> button. Use the manufacturer's scan tool for module-specific clearing and service functions.</div></div>`;
 };
 

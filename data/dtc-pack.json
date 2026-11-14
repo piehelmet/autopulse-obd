@@ -1,8 +1,8 @@
 {
-  "version": "2026.11.2",
-  "updatedAt": "2026-11-13",
-  "source": "AutoPulse transmission and module supplement",
-  "notes": "Generic SAE J2012 transmission codes plus make/model/module-specific descriptions for the 2011 Toyota Camry 2AR-FE/U760E and the 2008 Dodge Grand Caravan 62TE. Entries with make/model/module fields are only used when the active vehicle or module scan matches them.",
+  "version": "2026.11.3",
+  "updatedAt": "2026-11-14",
+  "source": "AutoPulse transmission, module and immobilizer supplement",
+  "notes": "Generic SAE J2012 transmission codes plus make/model/module-specific descriptions for the 2011 Toyota Camry 2AR-FE/U760E, the 2008 Dodge Grand Caravan 62TE, and its Sentry Key/SKREEM immobilizer. Entries with make/model/module fields are only used when the active vehicle or module scan matches them.",
   "codes": [
     {
       "code": "P0700",
@@ -262,6 +262,36 @@
       "module": "TCM",
       "causes": ["Loss of pump prime", "Low fluid level", "Filter seal or pickup leak", "Internal hydraulic pressure leak"],
       "symptoms": ["No movement after start", "Slipping", "Limp mode", "MIL on"]
+    },
+    {
+      "code": "P0513",
+      "description": "Invalid SKIM key (Sentry Key not accepted by the SKREEM/WCM)",
+      "system": "Powertrain",
+      "severity": "high",
+      "make": "Dodge",
+      "model": "Grand Caravan",
+      "causes": ["Unprogrammed or invalid Sentry Key", "Key transponder fault", "SKREEM/WCM key data mismatch", "SKREEM/WCM power or communication fault"],
+      "symptoms": ["No crank / no start", "Security indicator flashing", "Engine starts then stalls after about two seconds", "MIL on"]
+    },
+    {
+      "code": "P0633",
+      "description": "SKIM secret key not stored in PCM (PCM has not learned the Sentry Key secret)",
+      "system": "Powertrain",
+      "severity": "high",
+      "make": "Dodge",
+      "model": "Grand Caravan",
+      "causes": ["PCM replacement or reflash without immobilizer learn", "SKREEM/WCM to PCM handshake failure", "Unprogrammed Sentry Key", "PCM or SKREEM/WCM fault"],
+      "symptoms": ["No crank / no start", "Engine starts then stalls", "Security indicator flashing", "MIL on"]
+    },
+    {
+      "code": "U0168",
+      "description": "Lost communication with vehicle security control module (SKREEM/WCM)",
+      "system": "Network",
+      "severity": "high",
+      "make": "Dodge",
+      "model": "Grand Caravan",
+      "causes": ["CAN bus fault", "SKREEM/WCM power or ground fault", "SKREEM/WCM failure", "Open or shorted wiring"],
+      "symptoms": ["No crank / no start", "Security indicator flashing", "Multiple module warnings", "MIL on"]
     }
   ]
 }

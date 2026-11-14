@@ -293,6 +293,7 @@ export class DemoVehicle {
       tcm: [],
       abs: [],
       srs: [],
+      immobilizer: [],
     };
 
     if (isToyota) {
@@ -304,6 +305,9 @@ export class DemoVehicle {
       moduleCodes.tcm = [
         { code: 'P0796', status: 'stored', module: 'TCM', ecu: 'TCM', failureType: 0x00, udsCode: 'P0796-00', statusByte: 0x2f },
         { code: 'P2800', status: 'pending', module: 'TCM', ecu: 'TCM', failureType: 0x00, udsCode: 'P2800-00', statusByte: 0x07 },
+      ];
+      moduleCodes.immobilizer = [
+        { code: 'P0513', status: 'stored', module: 'IMMO', ecu: 'SKREEM', failureType: 0x00, udsCode: 'P0513-00', statusByte: 0x2f },
       ];
     } else {
       moduleCodes.tcm = [

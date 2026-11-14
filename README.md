@@ -56,6 +56,7 @@ How the Bluetooth picker appears depends on where you run the app:
 | --- | --- | --- |
 | Read stored, pending and permanent DTCs | Implemented | Mode 03 / 07 / 0A, generic code descriptions for ~90 codes plus fallback descriptions. Additional descriptions can be downloaded from the code library. |
 | Read TCM, ABS and airbag module codes | Experimental | Direct physical addressing on 11-bit CAN (7E0–7E7 request / 7E8–7EF response) with UDS `19 02` or KWP2000 `18 02`, plus a Mode 03 fallback. Read-only. Depends on the adapter's multi-frame support and the vehicle's module map. |
+| Read immobilizer / Sentry Key (SKREEM/WCM) codes | Experimental (read-only) | The 2008 Grand Caravan preset probes a best-effort `7E4 → 7EC` address for SKREEM/WCM codes. Key and fob programming, PIN/SKIM retrieval, security access and module pairing are not implemented. |
 | Clear DTCs and reset readiness | Implemented | Mode 04 with confirmation and safety warnings. Module-specific clearing is not implemented. |
 | Freeze frame | Implemented | Demo data and Mode 02 reads on real adapters. |
 | Readiness monitors / MIL status | Implemented | Mode 01 PID 01 decoding. |
@@ -88,7 +89,7 @@ How the Bluetooth picker appears depends on where you run the app:
 
 - **Dashboard** — KPI cards, range/fuel/battery estimates, editable widget grid, demo drive controls.
 - **Live data** — searchable sensor table, sparklines, favorites, custom PID editor.
-- **Diagnostics** — generic scan, clear, code details, freeze frame, Mode 06, readiness monitors, and an experimental TCM/ABS/SRS module scan.
+- **Diagnostics** — generic scan, clear, code details, freeze frame, Mode 06, readiness monitors, and an experimental read-only TCM/ABS/SRS/SKREEM module scan.
 - **Trips** — background recorder, live stats, saved trip history and charts.
 - **Performance** — staged tests, automatic timing, personal bests and result history.
 - **Service & coding** — 12 guided service routines and manufacturer coding catalogues (clearly marked simulated).
@@ -114,7 +115,24 @@ Pack entries can carry optional `make`, `model` and `module` fields. Lookups sco
 
 **Diagnostics → Scan all modules** asks the TCM, ABS and airbag controllers for their codes directly. It pauses live polling, switches the adapter to 11-bit 500 kbps CAN, sets the physical request/receive headers, tries UDS `19 02 FF`, then KWP2000 `18 02 FF`, then a generic Mode 03 fallback. After the scan it resets the adapter and re-applies the normal polling settings.
 
-This is read-only and clearly marked experimental. Generic OBD-II still reads only the **engine control module (ECM/PCM)**. Module addresses vary between models, and clone ELM327 v1.5 firmware often cannot reassemble multi-frame CAN replies; a module that does not answer may still be healthy. Use a manufacturer scan tool for module-specific clearing, adaptations and service functions.
+The 2008 Grand Caravan preset also includes the wireless control module / Sentry Key Remote Entry Module (SKREEM/WCM) on a **best-effort** `7E4 → 7EC` address. Chrysler CAN layouts vary and `7E4` carries other modules on some makes, so this entry is opt-in for the Caravan preset and the UI labels the address as best-effort. A module that does not answer may still be healthy.
+
+This is read-only and clearly marked experimental. Generic OBD-II still reads only the **engine control module (ECM/PCM)**. Module addresses vary between models, and clone ELM327 v1.5 firmware often cannot reassemble multi-frame CAN replies. Use a manufacturer scan tool for module-specific clearing, adaptations and service functions.
+
+### Key fobs and immobilizer
+
+AutoPulse reads immobilizer trouble codes only. It does **not** create, clone or program keys or fobs, read PIN/SKIM secrets, perform security access, or pair a replacement module. Those operations are security-sensitive and require a dealer, an automotive locksmith or an owner-authorized programmer (for example a dedicated key programmer you control).
+
+If a key is rejected or a fob stops working:
+
+1. **Confirm which system is involved.** The transponder chip in the key authorises starting through the immobilizer. Remote lock/unlock buttons use the separate remote keyless entry (RKE) system. Some fobs combine both, so a working remote does not prove the immobilizer key is valid.
+2. **Try every key you own.** Note which keys start the engine, which only turn the ignition, and which remote buttons work. This tells a locksmith or dealer whether the fault is the key, the SKREEM/WCM or the PCM.
+3. **Read codes before programming.** `P0513` (invalid SKIM key), `P0633` (SKIM secret key not stored in PCM) and `U0168` (lost communication with the vehicle security module) point to different faults. A communication code may be wiring or module power, not a bad key.
+4. **Use a legitimate route.** A dealer or automotive locksmith can verify ownership and program a key that you own. If you use an owner-authorized programmer, follow its instructions exactly and keep the vehicle battery supported during the procedure.
+5. **Keep security data private.** Do not share PIN/SKIM codes, seed/key values or module dumps with strangers or online “unlock” services. AutoPulse has no field for them and never asks for them.
+6. **Check the result.** After programming, verify that every fob starts the vehicle, that the remote buttons work, that the security indicator behaves normally, and that `P0513`, `P0633` and `U0168` do not return after a drive cycle.
+
+If the SKREEM/WCM is electronically locked up, a scan tool may report it as “off bus”. A battery disconnect or a manufacturer scan-tool reset may be required; AutoPulse cannot perform that reset.
 
 ---
 
@@ -155,6 +173,7 @@ source of truth: rebuild the APK after changing anything here.
 - **Coding and several service routines are simulations.** They show the workflow but do not write to a real vehicle. Applying coding is blocked outside demo mode.
 - **Generic OBD-II is the baseline.** Mode 22 custom PIDs work if the ECU supports them. The experimental module scan can read TCM, ABS and airbag codes on some 11-bit CAN vehicles, but it is not a replacement for OEM diagnostics. Manufacturer adaptations, security access and module-specific clearing are not implemented.
 - **Module scan is best-effort.** Address maps are presets, not guarantees. A module may use a different address, a different diagnostic service, or a 29-bit CAN layout. ELM327 v1.5 clones may truncate multi-frame responses. The scan is read-only and never writes coding or adaptations.
+- **Immobilizer support is read-only and limited.** The SKREEM/WCM address is a best-effort candidate, and immobilizer codes are only as complete as the module's reply. AutoPulse never programs or clones keys or fobs, retrieves PIN/SKIM secrets, performs security access or pairs modules. Use a dealer, automotive locksmith or owner-authorized programmer for key work.
 - **DTC descriptions are updatable, not live.** The built-in library and the downloadable code pack are maintained with app releases; the app never silently fetches code data in the background.
 - **Web Bluetooth cannot see classic Bluetooth adapters.** Use a BLE ELM327 or a USB serial cable.
 - **Fuel economy** is derived from the ECU fuel-rate PID when available; otherwise estimates are less accurate.
