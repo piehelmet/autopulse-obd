@@ -273,6 +273,14 @@ export const DTC_DATABASE = [
 
 export const DTC_MAP = Object.fromEntries(DTC_DATABASE.map((x) => [x.code, x]));
 
+/* Built-in library version. Bump when DTC_DATABASE changes, and publish a
+ * matching data/dtc-pack.json so installed apps can pull newer descriptions
+ * without waiting for a full app update. */
+export const DTC_LIBRARY_VERSION = '2026.11';
+
+const PACK_KEY = 'autopulse.dtcPack.v1';
+const CODE_RE = /^[PCBU][0-9A-F]{4}$/;
+
 export const SYSTEM_NAMES = {
   P: 'Powertrain',
   C: 'Chassis',
@@ -282,8 +290,49 @@ export const SYSTEM_NAMES = {
 
 export const dtcSystem = (code = '') => SYSTEM_NAMES[code.charAt(0).toUpperCase()] || 'Unknown';
 
+const normalizeCode = (entry) => {
+  const code = String(entry?.code || '').toUpperCase().trim();
+  return {
+    code,
+    description: String(entry?.description || 'No description available'),
+    system: String(entry?.system || dtcSystem(code)),
+    severity: ['low', 'medium', 'high'].includes(entry?.severity) ? entry.severity : 'medium',
+    causes: Array.isArray(entry?.causes) && entry.causes.length ? entry.causes.map(String) : ['Component fault', 'Wiring or connector issue', 'Control module fault'],
+    symptoms: Array.isArray(entry?.symptoms) && entry.symptoms.length ? entry.symptoms.map(String) : ['Check engine light', 'Reduced performance'],
+  };
+};
+
+const readStoredPack = () => {
+  try {
+    const raw = localStorage.getItem(PACK_KEY);
+    if (!raw) return null;
+    const pack = JSON.parse(raw);
+    return pack && Array.isArray(pack.codes) ? pack : null;
+  } catch {
+    return null;
+  }
+};
+
+const initialPack = readStoredPack();
+let packMap = {};
+let packInfo = null;
+if (initialPack) {
+  for (const entry of initialPack.codes) {
+    const norm = normalizeCode(entry);
+    if (CODE_RE.test(norm.code)) packMap[norm.code] = norm;
+  }
+  if (Object.keys(packMap).length) {
+    packInfo = {
+      version: String(initialPack.version || 'custom'),
+      updatedAt: initialPack.updatedAt || null,
+      source: String(initialPack.source || 'downloaded pack'),
+    };
+  }
+}
+
 export const lookupDtc = (code) => {
   const key = String(code || '').toUpperCase().trim();
+  if (packMap[key]) return packMap[key];
   if (DTC_MAP[key]) return DTC_MAP[key];
   const system = dtcSystem(key);
   return {
@@ -295,6 +344,53 @@ export const lookupDtc = (code) => {
     symptoms: ['Check engine light', 'Reduced performance'],
   };
 };
+
+export const dtcLibraryInfo = () => ({
+  version: DTC_LIBRARY_VERSION,
+  builtIn: DTC_DATABASE.length,
+  downloaded: Object.keys(packMap).length,
+  packVersion: packInfo?.version || null,
+  packUpdatedAt: packInfo?.updatedAt || null,
+  packSource: packInfo?.source || null,
+});
+
+/* Validate and install a downloaded pack. Throws on unusable input. */
+export const applyDtcPack = (pack) => {
+  if (!pack || !Array.isArray(pack.codes)) throw new Error('Code pack is not a valid AutoPulse pack');
+  const next = {};
+  for (const entry of pack.codes) {
+    const norm = normalizeCode(entry);
+    if (CODE_RE.test(norm.code)) next[norm.code] = norm;
+  }
+  const count = Object.keys(next).length;
+  if (!count) throw new Error('Code pack contains no usable trouble codes');
+
+  packMap = next;
+  packInfo = {
+    version: String(pack.version || 'custom'),
+    updatedAt: pack.updatedAt || null,
+    source: String(pack.source || 'downloaded pack'),
+  };
+  try {
+    localStorage.setItem(PACK_KEY, JSON.stringify({
+      version: packInfo.version,
+      updatedAt: packInfo.updatedAt,
+      source: packInfo.source,
+      codes: Object.values(next),
+    }));
+  } catch {
+    /* storage full or unavailable: the pack still applies for this session */
+  }
+  return { ...dtcLibraryInfo(), count };
+};
+
+export const clearDtcPack = () => {
+  packMap = {};
+  packInfo = null;
+  try { localStorage.removeItem(PACK_KEY); } catch { /* ignore */ }
+  return dtcLibraryInfo();
+};
+
 
 export const severityRank = (s) => ({ low: 1, medium: 2, high: 3 }[s] || 2);
 

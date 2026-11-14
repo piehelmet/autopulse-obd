@@ -10,13 +10,19 @@ import { pageHead, modal, toast, confirmDialog } from './components.js';
 import { connection } from '../obd/connection.js';
 import { isSerialSupported, isBluetoothSupported } from '../obd/transport.js';
 import { isNativeApp } from '../obd/native-ble.js';
+import { dtcLibraryInfo, applyDtcPack } from '../data/dtc.js';
 import { download, pickFile, escapeHtml } from '../core/utils.js';
 
+const THEME_META = { dark: '#0a0f14', light: '#eef3f7', classic: '#161009' };
+
 export const applyTheme = (theme = 'dark') => {
-  const t = theme === 'light' ? 'light' : 'dark';
+  const t = theme === 'light' || theme === 'classic' ? theme : 'dark';
   document.documentElement.dataset.theme = t;
+  document.documentElement.dataset.gaugeStyle = t === 'classic' ? 'classic' : 'modern';
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', t === 'light' ? '#eef3f7' : '#0a0f14');
+  if (meta) meta.setAttribute('content', THEME_META[t]);
+  // Redraw canvases so gauges switch between modern and classic immediately.
+  window.dispatchEvent(new CustomEvent('autopulse:resize'));
 };
 
 const CURRENCIES = ['€', '$', '£', 'CHF', 'kr', 'zł', 'R$', '₹', '¥'];
@@ -58,6 +64,7 @@ export const render = (view) => {
     const bluetooth = isBluetoothSupported();
     const connected = connection.status === 'connected';
     const installable = Boolean(window.__apInstallPrompt);
+    const lib = dtcLibraryInfo();
     const counts = {
       vehicles: s.vehicles.length,
       trips: s.trips.length,
@@ -100,10 +107,11 @@ export const render = (view) => {
           `)}
 
           ${group('Units &amp; display', `
-            ${row('Theme', 'Dark is designed for night driving. Light suits bright daylight.', `
+            ${row('Theme', 'Dark for night driving, Light for daylight, Classic for analogue gauges and a warm instrument-panel look.', `
               <div class="segmented" id="setTheme">
-                <button type="button" data-theme-choice="dark" class="${s.theme !== 'light' ? 'active' : ''}">${icon('moon')}<span>Dark</span></button>
+                <button type="button" data-theme-choice="dark" class="${s.theme !== 'light' && s.theme !== 'classic' ? 'active' : ''}">${icon('moon')}<span>Dark</span></button>
                 <button type="button" data-theme-choice="light" class="${s.theme === 'light' ? 'active' : ''}">${icon('sun')}<span>Light</span></button>
+                <button type="button" data-theme-choice="classic" class="${s.theme === 'classic' ? 'active' : ''}">${icon('gauge')}<span>Classic</span></button>
               </div>`)}
             ${row('Units', 'Metric uses km/h, km, °C, L and kPa. Imperial uses mph, mi, °F, gal and psi.', `
               <div class="segmented" id="setUnits">
@@ -156,10 +164,20 @@ export const render = (view) => {
               <button class="btn btn-xs btn-danger" id="setResetBtn" type="button">${icon('trash')}<span>Erase</span></button>`)}
           `)}
 
+          ${group('Diagnostic code library', `
+            ${row('Code descriptions', `${lib.builtIn} built-in descriptions${lib.downloaded ? ` plus ${lib.downloaded} from pack ${escapeHtml(lib.packVersion || '')}` : ''}. Downloaded packs add or correct descriptions without reinstalling the app.`, `
+              <div class="row" style="gap:5px;flex-wrap:wrap;justify-content:flex-end">
+                <span class="chip info">Library ${escapeHtml(lib.version)}</span>
+                <button class="btn btn-xs" id="setDtcUpdateBtn" type="button">${icon('refresh')}<span>Check for updates</span></button>
+              </div>`)}
+            ${row('Transmission (TCM) codes', 'Generic OBD-II reads the engine control module (ECM/PCM) only. Direct TCM, ABS and airbag codes require manufacturer-specific diagnostics and are not read here.', `
+              <span class="chip warn">ECM only</span>`)}
+          `)}
+
           ${group('About', `
             <div class="settings-row">
               <div class="sr-text">
-                <b>AutoPulse OBD2 v1.1.0</b>
+                <b>AutoPulse OBD2 v1.2.0</b>
                 <span>Independent offline-capable OBD-II diagnostics PWA. Not affiliated with Car Scanner, ELM Electronics or any vehicle manufacturer.</span>
               </div>
               <div class="sr-control"><span class="chip accent">PWA</span></div>
@@ -260,6 +278,31 @@ export const render = (view) => {
       } catch { /* ignore */ }
       window.__apInstallPrompt = null;
       build();
+    });
+
+    view.querySelector('#setDtcUpdateBtn')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        const res = await fetch(`data/dtc-pack.json?t=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        const pack = await res.json();
+        const info = applyDtcPack(pack);
+        toast('Code library updated', {
+          message: `${info.count} codes · pack ${info.packVersion || info.version}`,
+          type: 'ok',
+        });
+        build();
+      } catch (err) {
+        toast('Could not update the code library', {
+          message: navigator.onLine === false
+            ? 'You are offline. The built-in library still works.'
+            : (err.message || 'Download failed.'),
+          type: 'warn',
+        });
+      } finally {
+        btn.disabled = false;
+      }
     });
 
     view.querySelector('#setResetBtn')?.addEventListener('click', async () => {

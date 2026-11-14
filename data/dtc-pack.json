@@ -1,0 +1,168 @@
+{
+  "version": "2026.11.1",
+  "updatedAt": "2026-11-13",
+  "source": "AutoPulse transmission supplement",
+  "notes": "Generic SAE J2012 transmission-related powertrain codes. These are stored in the engine control module when the transmission control module requests the MIL. Reading codes directly from a TCM requires manufacturer-specific diagnostics.",
+  "codes": [
+    {
+      "code": "P0700",
+      "description": "Transmission control system malfunction (MIL request)",
+      "system": "Transmission",
+      "severity": "medium",
+      "causes": ["TCM stored a fault", "CAN communication fault between ECM and TCM", "TCM power or ground fault"],
+      "symptoms": ["MIL on", "Transmission may use a default shift pattern", "Harsh or delayed shifts"]
+    },
+    {
+      "code": "P0705",
+      "description": "Transmission range sensor circuit malfunction",
+      "system": "Transmission",
+      "severity": "medium",
+      "causes": ["Faulty range switch", "Misadjusted selector cable", "Open or shorted wiring"],
+      "symptoms": ["No start in Park or Neutral", "Wrong gear indicated", "Reverse lamps inoperative"]
+    },
+    {
+      "code": "P0706",
+      "description": "Transmission range sensor circuit range / performance",
+      "system": "Transmission",
+      "severity": "medium",
+      "causes": ["Worn range switch contacts", "Selector cable stretch", "Water intrusion in connector"],
+      "symptoms": ["Intermittent no-crank", "Unexpected gear engagement", "MIL on"]
+    },
+    {
+      "code": "P0711",
+      "description": "Transmission fluid temperature sensor range / performance",
+      "system": "Transmission",
+      "severity": "medium",
+      "causes": ["Faulty fluid temperature sensor", "Low fluid level", "Sensor wiring fault"],
+      "symptoms": ["Harsh shifts when cold", "Torque converter clutch inhibited", "MIL on"]
+    },
+    {
+      "code": "P0712",
+      "description": "Transmission fluid temperature sensor circuit low input",
+      "system": "Transmission",
+      "severity": "low",
+      "causes": ["Sensor shorted to ground", "Chafed harness", "Failed sensor"],
+      "symptoms": ["MIL on", "Shift quality changes", "Fluid temperature reads implausible"]
+    },
+    {
+      "code": "P0713",
+      "description": "Transmission fluid temperature sensor circuit high input",
+      "system": "Transmission",
+      "severity": "low",
+      "causes": ["Open sensor circuit", "Unplugged connector", "Failed sensor"],
+      "symptoms": ["MIL on", "Late torque converter lockup", "Poor cold shift quality"]
+    },
+    {
+      "code": "P0715",
+      "description": "Input / turbine speed sensor circuit malfunction",
+      "system": "Transmission",
+      "severity": "high",
+      "causes": ["Failed input speed sensor", "Damaged reluctor ring", "Wiring fault"],
+      "symptoms": ["Limp mode", "No upshift", "Speedometer or tachometer irregularity"]
+    },
+    {
+      "code": "P0720",
+      "description": "Output speed sensor circuit malfunction",
+      "system": "Transmission",
+      "severity": "high",
+      "causes": ["Failed output speed sensor", "Debris on sensor tip", "Connector corrosion"],
+      "symptoms": ["Erratic speedometer", "Harsh engagement", "Limp mode"]
+    },
+    {
+      "code": "P0725",
+      "description": "Engine speed input circuit malfunction",
+      "system": "Transmission",
+      "severity": "medium",
+      "causes": ["CAN signal fault", "TCM internal fault", "Crankshaft sensor intermittent"],
+      "symptoms": ["Torque converter clutch cycling", "Poor shift timing", "MIL on"]
+    },
+    {
+      "code": "P0730",
+      "description": "Incorrect gear ratio",
+      "system": "Transmission",
+      "severity": "high",
+      "causes": ["Low fluid level", "Slipping clutch pack", "Valve body fault", "Failed speed sensor"],
+      "symptoms": ["Slipping during acceleration", "Limp mode", "Burning fluid smell"]
+    },
+    {
+      "code": "P0731",
+      "description": "Gear 1 incorrect ratio",
+      "system": "Transmission",
+      "severity": "high",
+      "causes": ["Worn first gear clutch pack", "Low line pressure", "Valve body sticking"],
+      "symptoms": ["Poor acceleration from rest", "Harsh 1-2 shift", "Limp mode"]
+    },
+    {
+      "code": "P0740",
+      "description": "Torque converter clutch circuit malfunction",
+      "system": "Transmission",
+      "severity": "medium",
+      "causes": ["Failed TCC solenoid", "Restricted valve body passage", "Wiring fault"],
+      "symptoms": ["No lockup at cruise", "Poor fuel economy", "Shudder at light throttle"]
+    },
+    {
+      "code": "P0741",
+      "description": "Torque converter clutch stuck off",
+      "system": "Transmission",
+      "severity": "medium",
+      "causes": ["Sticking TCC solenoid", "Leaking TCC circuit seal", "Valve body wear"],
+      "symptoms": ["Higher cruise RPM", "Reduced fuel economy", "MIL on"]
+    },
+    {
+      "code": "P0742",
+      "description": "Torque converter clutch stuck on",
+      "system": "Transmission",
+      "severity": "high",
+      "causes": ["TCC solenoid stuck energized", "Short to power in TCC circuit", "Valve body jammed"],
+      "symptoms": ["Engine stalls when stopping", "Harsh deceleration", "MIL on"]
+    },
+    {
+      "code": "P0750",
+      "description": "Shift solenoid A malfunction",
+      "system": "Transmission",
+      "severity": "high",
+      "causes": ["Failed solenoid A", "Open circuit in solenoid harness", "TCM driver fault"],
+      "symptoms": ["Stuck in one gear", "Limp mode", "Harsh engagement"]
+    },
+    {
+      "code": "P0770",
+      "description": "Shift solenoid E malfunction",
+      "system": "Transmission",
+      "severity": "medium",
+      "causes": ["Failed solenoid E", "Contaminated fluid", "Wiring fault"],
+      "symptoms": ["Delayed shifts", "No overdrive", "MIL on"]
+    },
+    {
+      "code": "P0796",
+      "description": "Pressure control solenoid C stuck off",
+      "system": "Transmission",
+      "severity": "high",
+      "causes": ["Sticking pressure solenoid", "Valve body contamination", "Low fluid level"],
+      "symptoms": ["Slipping under load", "Limp mode", "Harsh shifts"]
+    },
+    {
+      "code": "P0810",
+      "description": "Clutch position control error",
+      "system": "Transmission",
+      "severity": "medium",
+      "causes": ["Clutch actuator fault", "Position sensor fault", "Hydraulic leak"],
+      "symptoms": ["Difficulty engaging gear", "Jerky take-off", "MIL on"]
+    },
+    {
+      "code": "P0868",
+      "description": "Transmission fluid pressure low",
+      "system": "Transmission",
+      "severity": "high",
+      "causes": ["Low fluid level", "Worn pump", "Internal leak", "Clogged filter"],
+      "symptoms": ["Slipping", "Delayed engagement", "Limp mode"]
+    },
+    {
+      "code": "P0882",
+      "description": "TCM power input signal low",
+      "system": "Transmission",
+      "severity": "medium",
+      "causes": ["Weak battery", "Corroded power feed", "Blown TCM fuse"],
+      "symptoms": ["No communication with TCM", "Harsh shifts", "No start in some vehicles"]
+    }
+  ]
+}

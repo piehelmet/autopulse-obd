@@ -1,6 +1,6 @@
 /* AutoPulse OBD2 — offline service worker */
 
-const CACHE = 'autopulse-obd-v1.1.0';
+const CACHE = 'autopulse-obd-v1.2.0';
 const ASSETS = [
   './',
   './index.html',
@@ -20,6 +20,7 @@ const ASSETS = [
   './js/core/trips.js',
   './js/data/pids.js',
   './js/data/dtc.js',
+  './data/dtc-pack.json',
   './js/data/vehicles.js',
   './js/data/custom.js',
   './js/obd/simulator.js',
@@ -64,6 +65,24 @@ const isCacheable = (request) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (!isCacheable(request)) return;
+
+  // The diagnostic code library is meant to be refreshable, so try the
+  // network first and fall back to the cached copy when offline.
+  if (new URL(request.url).pathname.endsWith('/data/dtc-pack.json')) {
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        if (response && response.ok) {
+          const cache = await caches.open(CACHE);
+          cache.put(request, response.clone()).catch(() => {});
+        }
+        return response;
+      } catch {
+        return (await caches.match(request)) || Response.error();
+      }
+    })());
+    return;
+  }
 
   if (request.mode === 'navigate') {
     event.respondWith((async () => {

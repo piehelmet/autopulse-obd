@@ -47,6 +47,14 @@ export const gaugeColor = (value, opts = {}) => {
 export const drawGauge = (canvas, opts = {}) => {
   const p = prepare(canvas);
   if (!p) return;
+  if ((document.documentElement.dataset.gaugeStyle || 'modern') === 'classic') {
+    drawClassicGauge(p, opts);
+    return;
+  }
+  drawModernGauge(p, opts);
+};
+
+const drawModernGauge = (p, opts = {}) => {
   const { ctx, w, h } = p;
   const c = palette();
   const {
@@ -129,6 +137,194 @@ export const drawGauge = (canvas, opts = {}) => {
     ctx.font = `700 ${Math.max(8, size * 0.075)}px 'Segoe UI', sans-serif`;
     ctx.fillText((label || unit || '').toUpperCase(), cx, cy + size * 0.15);
   }
+};
+
+/* Classic analogue gauge: cream dial, chrome bezel, red needle.
+ * Used by the "Classic" theme (data-gauge-style="classic"). */
+const niceStep = (range, target = 6) => {
+  const rough = range / target;
+  const pow = 10 ** Math.floor(Math.log10(rough || 1));
+  const n = rough / pow;
+  const mult = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10;
+  return mult * pow;
+};
+
+const dialLabel = (v) => {
+  const abs = Math.abs(v);
+  if (abs >= 1000) return `${Math.round(v / 100) / 10}k`.replace('.0k', 'k');
+  if (abs >= 10) return String(Math.round(v));
+  return String(Math.round(v * 10) / 10);
+};
+
+const drawClassicGauge = (p, opts = {}) => {
+  const { ctx, w, h } = p;
+  const {
+    value = 0, min = 0, max = 100, redline, dangerAt, decimals = 0,
+  } = opts;
+
+  const size = Math.min(w, h);
+  const cx = w / 2;
+  const cy = h / 2 + size * 0.02;
+  const outer = Math.max(6, size / 2 - Math.max(2, size * 0.015));
+  const face = outer * 0.93;
+  const start = Math.PI * 0.75;
+  const end = Math.PI * 2.25;
+  const span = end - start;
+  const range = (max - min) || 1;
+  const frac = clamp((Number(value) - min) / range, 0, 1);
+
+  // Chrome bezel
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, outer, 0, Math.PI * 2);
+  ctx.shadowColor = 'rgba(0,0,0,.55)';
+  ctx.shadowBlur = size * 0.06;
+  ctx.shadowOffsetY = size * 0.02;
+  const bezel = ctx.createLinearGradient(cx - outer, cy - outer, cx + outer, cy + outer);
+  bezel.addColorStop(0, '#efe7d6');
+  bezel.addColorStop(0.24, '#8d8574');
+  bezel.addColorStop(0.48, '#f7f1e2');
+  bezel.addColorStop(0.7, '#6f6858');
+  bezel.addColorStop(1, '#cfc6b2');
+  ctx.fillStyle = bezel;
+  ctx.fill();
+  ctx.restore();
+
+  // Cream dial face
+  ctx.beginPath();
+  ctx.arc(cx, cy, face, 0, Math.PI * 2);
+  const faceGrad = ctx.createRadialGradient(cx, cy - face * 0.35, face * 0.08, cx, cy, face);
+  faceGrad.addColorStop(0, '#fcf8ee');
+  faceGrad.addColorStop(0.6, '#f0e6d2');
+  faceGrad.addColorStop(1, '#d9cdb4');
+  ctx.fillStyle = faceGrad;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, face, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(62,50,32,.38)';
+  ctx.lineWidth = Math.max(1, size * 0.008);
+  ctx.stroke();
+
+  const tickR = face * 0.84;
+
+  // Redline band on the dial
+  if (redline !== undefined && redline > min) {
+    const rf = clamp((redline - min) / range, 0, 1);
+    ctx.beginPath();
+    ctx.arc(cx, cy, tickR + face * 0.04, start + span * rf, end);
+    ctx.strokeStyle = '#b3271e';
+    ctx.lineWidth = Math.max(2, face * 0.045);
+    ctx.lineCap = 'butt';
+    ctx.stroke();
+  }
+
+  // Ticks and numerals
+  const step = niceStep(range);
+  const minor = step / 5;
+  const first = Math.ceil(min / minor) * minor;
+  const labelR = face * 0.6;
+  const showLabels = size >= 112;
+  for (let v = first; v <= max + minor * 0.001; v += minor) {
+    const f = clamp((v - min) / range, 0, 1);
+    const a = start + span * f;
+    const major = Math.abs(v / step - Math.round(v / step)) < 1e-6;
+    const r1 = tickR - face * (major ? 0.1 : 0.045);
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+    ctx.lineTo(cx + Math.cos(a) * tickR, cy + Math.sin(a) * tickR);
+    ctx.strokeStyle = '#241c12';
+    ctx.lineWidth = major ? Math.max(1.6, face * 0.02) : Math.max(1, face * 0.007);
+    ctx.lineCap = 'butt';
+    ctx.stroke();
+
+    if (major && showLabels) {
+      ctx.fillStyle = '#3a2f20';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `600 ${Math.max(8, face * 0.082)}px Georgia, 'Times New Roman', serif`;
+      ctx.fillText(dialLabel(v), cx + Math.cos(a) * labelR, cy + Math.sin(a) * labelR);
+    }
+  }
+
+  // Needle
+  const a = start + span * frac;
+  const len = tickR - face * 0.06;
+  const tail = face * 0.15;
+  const half = Math.max(1.5, face * 0.026);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(a);
+  ctx.beginPath();
+  ctx.moveTo(-tail, 0);
+  ctx.lineTo(0, -half);
+  ctx.lineTo(len, -half * 0.3);
+  ctx.lineTo(len, half * 0.3);
+  ctx.lineTo(0, half);
+  ctx.closePath();
+  ctx.shadowColor = 'rgba(0,0,0,.45)';
+  ctx.shadowBlur = size * 0.03;
+  ctx.shadowOffsetX = size * 0.012;
+  ctx.shadowOffsetY = size * 0.012;
+  ctx.fillStyle = dangerAt !== undefined && Number(value) >= dangerAt ? '#d21f14' : '#a8231b';
+  ctx.fill();
+  ctx.restore();
+
+  // Hub
+  const hubR = Math.max(3.5, face * 0.08);
+  const hub = ctx.createRadialGradient(cx - hubR * 0.4, cy - hubR * 0.4, hubR * 0.2, cx, cy, hubR);
+  hub.addColorStop(0, '#f4ecdb');
+  hub.addColorStop(0.55, '#8a7c63');
+  hub.addColorStop(1, '#3b3226');
+  ctx.beginPath();
+  ctx.arc(cx, cy, hubR, 0, Math.PI * 2);
+  ctx.fillStyle = hub;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, hubR * 0.42, 0, Math.PI * 2);
+  ctx.fillStyle = '#241d14';
+  ctx.fill();
+
+  // Digital readout in the open bottom of the sweep, like an odometer window
+  const readout = opts.text !== undefined
+    ? String(opts.text)
+    : (decimals ? Number(value).toFixed(decimals) : String(Math.round(Number(value))));
+  let valueSize = Math.max(9, face * 0.27);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#241c12';
+  do {
+    ctx.font = `700 ${valueSize}px Consolas, 'Cascadia Mono', monospace`;
+    if (ctx.measureText(readout).width <= face * 0.92) break;
+    valueSize *= 0.92;
+  } while (valueSize > 8);
+  ctx.fillText(readout, cx, cy + face * 0.56);
+
+  if (opts.unit) {
+    const unitSize = Math.max(6, face * 0.13);
+    ctx.font = `700 ${unitSize}px 'Segoe UI', Arial, sans-serif`;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = `${Math.max(0.5, unitSize * 0.12)}px`;
+    ctx.fillStyle = '#6a5b43';
+    ctx.fillText(String(opts.unit).toUpperCase(), cx, cy + face * 0.79);
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+  }
+
+  // Glass reflection
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, face * 0.98, 0, Math.PI * 2);
+  ctx.clip();
+  const glass = ctx.createLinearGradient(cx, cy - face, cx, cy + face * 0.3);
+  glass.addColorStop(0, 'rgba(255,255,255,.30)');
+  glass.addColorStop(0.5, 'rgba(255,255,255,.06)');
+  glass.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.beginPath();
+  ctx.arc(cx, cy - face * 0.16, face * 0.96, Math.PI * 1.04, Math.PI * 1.96);
+  ctx.lineTo(cx + face * 0.55, cy - face * 0.02);
+  ctx.lineTo(cx - face * 0.55, cy - face * 0.02);
+  ctx.closePath();
+  ctx.fillStyle = glass;
+  ctx.fill();
+  ctx.restore();
 };
 
 export const drawSparkline = (canvas, data = [], color) => {

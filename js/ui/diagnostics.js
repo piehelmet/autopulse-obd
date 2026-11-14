@@ -2,7 +2,7 @@
 
 import { getState, activeVehicle } from '../core/store.js';
 import { PIDS_BY_KEY } from '../data/pids.js';
-import { lookupDtc, severityRank } from '../data/dtc.js';
+import { lookupDtc, severityRank, dtcLibraryInfo } from '../data/dtc.js';
 import { displayPid } from '../core/display.js';
 import { icon } from '../core/icons.js';
 import { pageHead, modal, toast, confirmDialog, emptyState, spinner, tabs } from './components.js';
@@ -177,8 +177,15 @@ export const render = (view) => {
 };
 
 const codesPanel = (dtcs) => {
+  const lib = dtcLibraryInfo();
+  const libraryNote = `
+    <div class="callout" style="margin-top:6px">${icon('info')}<div>
+      <b>Engine module only.</b> Generic OBD-II reads the ECM/PCM. Transmission (TCM), ABS and airbag codes need manufacturer-specific diagnostics and are not read here.
+      <div class="small muted" style="margin-top:4px">Code library ${escapeHtml(lib.version)} · ${lib.builtIn} built-in${lib.downloaded ? ` + ${lib.downloaded} downloaded (${escapeHtml(lib.packVersion || 'pack')})` : ''} descriptions.</div>
+    </div></div>`;
+
   if (!dtcs.length) {
-    return `<div class="dtc-empty">${icon('shield')}<b>No trouble codes stored</b><span class="small">The ECU did not report any stored, pending or permanent faults.</span></div>`;
+    return `<div class="dtc-empty">${icon('shield')}<b>No trouble codes stored</b><span class="small">The ECU did not report any stored, pending or permanent faults.</span></div>${libraryNote}`;
   }
   const groups = [
     { status: 'stored', label: 'Stored codes', list: dtcs.filter((d) => d.status === 'stored') },
@@ -186,7 +193,7 @@ const codesPanel = (dtcs) => {
     { status: 'permanent', label: 'Permanent codes', list: dtcs.filter((d) => d.status === 'permanent') },
   ].filter((g) => g.list.length);
 
-  return groups.map((g) => `
+  return `${groups.map((g) => `
     <div class="between" style="margin:6px 0 8px">
       <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)">${g.label}</h3>
       <span class="small muted">${g.list.length}</span>
@@ -210,7 +217,7 @@ const codesPanel = (dtcs) => {
           </div>
         </div>`;
       }).join('')}
-    </div>`).join('');
+    </div>`).join('')}${libraryNote}`;
 };
 
 const freezePanel = (frame) => {

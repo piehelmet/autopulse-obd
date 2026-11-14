@@ -14,7 +14,7 @@ Open **<https://piehelmet.github.io/autopulse-obd/>** in Chrome or Edge. Install
 
 ### Install the Android APK
 
-Download **[AutoPulse-OBD2-1.1.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.1.0/AutoPulse-OBD2-1.1.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser or file manager when prompted.
+Download **[AutoPulse-OBD2-1.2.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.2.0/AutoPulse-OBD2-1.2.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser or file manager when prompted.
 
 The APK is a self-contained native app. Every asset is bundled inside it, so it works with no internet connection at all — even on first launch. It does **not** use the Chrome app, has no URL bar, and does not depend on GitHub Pages being reachable. Bluetooth ELM327 adapters are reached through the Android Bluetooth LE stack directly.
 
@@ -54,7 +54,7 @@ How the Bluetooth picker appears depends on where you run the app:
 
 | Car Scanner / APK capability | AutoPulse status | Notes |
 | --- | --- | --- |
-| Read stored, pending and permanent DTCs | Implemented | Mode 03 / 07 / 0A, generic code descriptions for ~90 codes plus fallback descriptions. |
+| Read stored, pending and permanent DTCs | Implemented | Mode 03 / 07 / 0A, generic code descriptions for ~90 codes plus fallback descriptions. Additional descriptions can be downloaded from the code library. |
 | Clear DTCs and reset readiness | Implemented | Mode 04 with confirmation and safety warnings. |
 | Freeze frame | Implemented | Demo data and Mode 02 reads on real adapters. |
 | Readiness monitors / MIL status | Implemented | Mode 01 PID 01 decoding. |
@@ -71,7 +71,7 @@ How the Bluetooth picker appears depends on where you run the app:
 | Raw ELM327 terminal | Implemented | AT and OBD commands, history, quick commands, copy/save log. |
 | Vehicle profiles / garage | Implemented | Presets, VIN, tank, odometer, notes and per-vehicle trip stats. |
 | HUD / mirrored display | Implemented | Configurable primary and secondary metric. |
-| Dark / light theme, metric / imperial units | Implemented | Persisted locally. |
+| Dark / light / classic theme, metric / imperial units | Implemented | Persisted locally. Classic swaps the gauges for analogue dials with a warm instrument-panel palette. |
 | Local backup / restore | Implemented | Full JSON export and import. |
 | Offline use | Implemented | Service worker precaches the complete app. |
 | Cloud sync / account | Not implemented | Everything is local by design; export JSON for backup. |
@@ -93,7 +93,21 @@ How the Bluetooth picker appears depends on where you run the app:
 - **Service & coding** — 12 guided service routines and manufacturer coding catalogues (clearly marked simulated).
 - **Terminal** — raw ELM327 command console with logging.
 - **Garage** — vehicle profiles, presets and active vehicle selection.
-- **Settings** — connection setup, polling, units, theme, HUD metrics, fuel price, backup/restore and data erase.
+- **Settings** — connection setup, polling, units, theme (dark, light, classic analogue), HUD metrics, fuel price, code-library updates, backup/restore and data erase.
+
+### Themes
+
+The theme picker in **Settings → Units & display** offers three looks:
+
+- **Dark** — the default high-contrast night palette.
+- **Light** — bright daylight palette.
+- **Classic** — warm walnut and brass instrument-panel palette with analogue gauges: cream dial faces, chrome bezels, serif numerals, a red needle and an odometer-style digital readout. The choice is saved with the rest of the app state.
+
+### Diagnostic code library
+
+Descriptions ship inside the app, so scanning works with no network. **Settings → Diagnostic code library → Check for updates** downloads `data/dtc-pack.json`, a versioned supplement that adds or corrects descriptions (for example transmission-related powertrain codes) without reinstalling the app. A downloaded pack is stored locally, takes precedence over the built-in text, and survives restarts. If the download fails or the device is offline, the built-in library keeps working.
+
+Generic OBD-II only reads the **engine control module (ECM/PCM)**. Transmission (TCM), ABS, airbag and other module codes require manufacturer-specific diagnostics; AutoPulse does not claim to read them, and the diagnostics screen says so explicitly.
 
 ---
 
@@ -132,7 +146,8 @@ source of truth: rebuild the APK after changing anything here.
 
 - **Not affiliated** with Car Scanner, ELM Electronics, any vehicle manufacturer or the authors of the original APK.
 - **Coding and several service routines are simulations.** They show the workflow but do not write to a real vehicle. Applying coding is blocked outside demo mode.
-- **Generic OBD-II only for real hardware.** Mode 22 custom PIDs work if the ECU supports them. Manufacturer-specific modules, adaptations and security access are not implemented.
+- **Generic OBD-II only for real hardware.** Mode 22 custom PIDs work if the ECU supports them. Manufacturer-specific modules, adaptations and security access are not implemented. In particular, generic OBD-II reads the engine control module only — direct TCM, ABS and airbag codes are not available without OEM diagnostics.
+- **DTC descriptions are updatable, not live.** The built-in library and the downloadable code pack are maintained with app releases; the app never silently fetches code data in the background.
 - **Web Bluetooth cannot see classic Bluetooth adapters.** Use a BLE ELM327 or a USB serial cable.
 - **Fuel economy** is derived from the ECU fuel-rate PID when available; otherwise estimates are less accurate.
 - **Readiness and Mode 06** depend on the vehicle and adapter. Some ECUs return nothing for generic requests.

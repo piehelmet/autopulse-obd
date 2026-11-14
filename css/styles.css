@@ -51,6 +51,41 @@
   --shadow:0 18px 50px rgba(23,54,78,.14);
   --shadow-sm:0 8px 22px rgba(23,54,78,.10);
 }
+[data-theme="classic"]{
+  --bg:#120e0a;
+  --bg-2:#181310;
+  --panel:#1d1712;
+  --panel-2:#241d16;
+  --panel-3:#2d241a;
+  --line:#3b2f22;
+  --line-2:#4d3d2b;
+  --text:#f2e6d0;
+  --text-2:#d9c7a9;
+  --muted:#a38f72;
+  --muted-2:#7d6a51;
+  --accent:#d8a63a;
+  --accent-rgb:216,166,58;
+  --accent-2:#c47a4a;
+  --accent-3:#8fa7b8;
+  --warn:#e0a33a;
+  --danger:#d1443c;
+  --ok:#7fa05a;
+  --shadow:0 18px 50px rgba(0,0,0,.58);
+  --shadow-sm:0 8px 22px rgba(0,0,0,.42);
+}
+[data-theme="classic"] body{
+  background:
+    radial-gradient(1100px 700px at 78% -10%,rgba(var(--accent-rgb),.10),transparent 62%),
+    radial-gradient(900px 650px at 12% 110%,rgba(196,122,74,.08),transparent 60%),
+    var(--bg);
+}
+[data-theme="classic"] .sidebar{background:linear-gradient(180deg,rgba(30,24,18,.97),rgba(16,12,9,.99))}
+[data-theme="classic"] .topbar{background:rgba(18,14,10,.8)}
+[data-theme="classic"] .brand-mark{color:#1d1509;background:linear-gradient(145deg,#e5bb5c,#a87b23)}
+[data-theme="classic"] .gauge-overlay{justify-content:flex-end;padding-top:0;padding-bottom:17%;opacity:0}
+[data-theme="classic"] .gauge-overlay b{color:#2b2318;text-shadow:0 1px 0 rgba(255,255,255,.5);font-size:clamp(14px,1.5vw,22px)}
+[data-theme="classic"] .gauge-overlay span{color:#6a5b43}
+
 *{box-sizing:border-box}
 html,body{height:100%}
 html{scroll-behavior:smooth}

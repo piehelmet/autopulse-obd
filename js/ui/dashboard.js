@@ -233,6 +233,7 @@ const makeUpdater = (root, dash) => {
         const { min, max } = range(r.pid);
         const opts = {
           value: d.value, min, max, decimals: d.decimals,
+          text: d.text, unit: d.unit,
           color: colors[r.pid.key],
           warnAt: r.pid.key === 'coolant' ? displayPid(r.pid, 105).value : undefined,
           dangerAt: r.pid.key === 'coolant' ? displayPid(r.pid, 113).value : r.pid.key === 'voltage' ? displayPid(r.pid, 15.5).value : undefined,
