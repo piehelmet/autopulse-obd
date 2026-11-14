@@ -2,6 +2,20 @@
 
 export const VEHICLE_PRESETS = [
   {
+    label: 'Toyota Camry 2.5 (2011) — 2AR-FE / U760E',
+    make: 'Toyota', model: 'Camry 2.5', year: 2011, fuel: 'Gasoline', tank: 70,
+    vin: '', engine: '2AR-FE 2.5L', transmission: 'U760E 6-speed automatic',
+    modulePreset: 'toyota-camry-2011',
+    notes: 'Separate TCM on the 11-bit CAN bus. Module scan probes 7E1 → 7E9.',
+  },
+  {
+    label: 'Dodge Grand Caravan 4.0 (2008) — 62TE',
+    make: 'Dodge', model: 'Grand Caravan 4.0', year: 2008, fuel: 'Gasoline', tank: 76,
+    vin: '', engine: '4.0L V6', transmission: '62TE 6-speed automatic',
+    modulePreset: 'dodge-caravan-2008',
+    notes: '62TE transmission. Module scan probes the standard 7E1 → 7E9 TCM pair.',
+  },
+  {
     label: 'Volkswagen Golf 1.4 TSI (2021)',
     make: 'Volkswagen', model: 'Golf 1.4 TSI', year: 2021, fuel: 'Gasoline', tank: 55,
     vin: 'WVWZZZAUZMW000001',

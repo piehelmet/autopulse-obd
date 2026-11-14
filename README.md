@@ -14,7 +14,7 @@ Open **<https://piehelmet.github.io/autopulse-obd/>** in Chrome or Edge. Install
 
 ### Install the Android APK
 
-Download **[AutoPulse-OBD2-1.2.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.2.0/AutoPulse-OBD2-1.2.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser or file manager when prompted.
+Download **[AutoPulse-OBD2-1.3.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.3.0/AutoPulse-OBD2-1.3.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser or file manager when prompted.
 
 The APK is a self-contained native app. Every asset is bundled inside it, so it works with no internet connection at all — even on first launch. It does **not** use the Chrome app, has no URL bar, and does not depend on GitHub Pages being reachable. Bluetooth ELM327 adapters are reached through the Android Bluetooth LE stack directly.
 
@@ -55,7 +55,8 @@ How the Bluetooth picker appears depends on where you run the app:
 | Car Scanner / APK capability | AutoPulse status | Notes |
 | --- | --- | --- |
 | Read stored, pending and permanent DTCs | Implemented | Mode 03 / 07 / 0A, generic code descriptions for ~90 codes plus fallback descriptions. Additional descriptions can be downloaded from the code library. |
-| Clear DTCs and reset readiness | Implemented | Mode 04 with confirmation and safety warnings. |
+| Read TCM, ABS and airbag module codes | Experimental | Direct physical addressing on 11-bit CAN (7E0–7E7 request / 7E8–7EF response) with UDS `19 02` or KWP2000 `18 02`, plus a Mode 03 fallback. Read-only. Depends on the adapter's multi-frame support and the vehicle's module map. |
+| Clear DTCs and reset readiness | Implemented | Mode 04 with confirmation and safety warnings. Module-specific clearing is not implemented. |
 | Freeze frame | Implemented | Demo data and Mode 02 reads on real adapters. |
 | Readiness monitors / MIL status | Implemented | Mode 01 PID 01 decoding. |
 | Mode 06 on-board monitor results | Implemented (demo) | Real Mode 06 values are manufacturer-specific; generic adapters often return nothing. |
@@ -87,7 +88,7 @@ How the Bluetooth picker appears depends on where you run the app:
 
 - **Dashboard** — KPI cards, range/fuel/battery estimates, editable widget grid, demo drive controls.
 - **Live data** — searchable sensor table, sparklines, favorites, custom PID editor.
-- **Diagnostics** — scan, clear, code details, freeze frame, Mode 06, readiness monitors.
+- **Diagnostics** — generic scan, clear, code details, freeze frame, Mode 06, readiness monitors, and an experimental TCM/ABS/SRS module scan.
 - **Trips** — background recorder, live stats, saved trip history and charts.
 - **Performance** — staged tests, automatic timing, personal bests and result history.
 - **Service & coding** — 12 guided service routines and manufacturer coding catalogues (clearly marked simulated).
@@ -105,9 +106,15 @@ The theme picker in **Settings → Units & display** offers three looks:
 
 ### Diagnostic code library
 
-Descriptions ship inside the app, so scanning works with no network. **Settings → Diagnostic code library → Check for updates** downloads `data/dtc-pack.json`, a versioned supplement that adds or corrects descriptions (for example transmission-related powertrain codes) without reinstalling the app. A downloaded pack is stored locally, takes precedence over the built-in text, and survives restarts. If the download fails or the device is offline, the built-in library keeps working.
+Descriptions ship inside the app, so scanning works with no network. The bundled `data/dtc-pack.json` is applied automatically on first launch, and again when a release ships a newer numeric pack version. **Settings → Diagnostic code library → Check for updates** re-downloads the pack on demand, so descriptions can be refreshed without reinstalling the app. The installed pack is stored locally, takes precedence over the built-in text, and survives restarts; a custom pack with a non-numeric version is never overwritten automatically. If the download fails or the device is offline, the bundled or stored library keeps working.
 
-Generic OBD-II only reads the **engine control module (ECM/PCM)**. Transmission (TCM), ABS, airbag and other module codes require manufacturer-specific diagnostics; AutoPulse does not claim to read them, and the diagnostics screen says so explicitly.
+Pack entries can carry optional `make`, `model` and `module` fields. Lookups score those fields against the active vehicle and the module that reported the code, so a Toyota-specific P2714 description is never shown for a Dodge, and a generic P0730 still resolves everywhere. The shipped pack includes U760E entries for the 2011 Camry and 62TE entries for the 2008 Grand Caravan.
+
+### Experimental module scan
+
+**Diagnostics → Scan all modules** asks the TCM, ABS and airbag controllers for their codes directly. It pauses live polling, switches the adapter to 11-bit 500 kbps CAN, sets the physical request/receive headers, tries UDS `19 02 FF`, then KWP2000 `18 02 FF`, then a generic Mode 03 fallback. After the scan it resets the adapter and re-applies the normal polling settings.
+
+This is read-only and clearly marked experimental. Generic OBD-II still reads only the **engine control module (ECM/PCM)**. Module addresses vary between models, and clone ELM327 v1.5 firmware often cannot reassemble multi-frame CAN replies; a module that does not answer may still be healthy. Use a manufacturer scan tool for module-specific clearing, adaptations and service functions.
 
 ---
 
@@ -124,7 +131,7 @@ autopulse-obd/
    ├─ app.js                  Bootstrap, router, status chrome
    ├─ core/                   utils, icons, store, display, history, trip recorder
    ├─ data/                   PIDs, DTCs, vehicle presets, service/coding catalogues
-   ├─ obd/                    simulator, serial/BLE transports, ELM327 connection
+   ├─ obd/                    simulator, serial/BLE transports, ELM327 connection, module scan
    └─ ui/                     one module per screen + shared components/charts/HUD
 ```
 
@@ -146,7 +153,8 @@ source of truth: rebuild the APK after changing anything here.
 
 - **Not affiliated** with Car Scanner, ELM Electronics, any vehicle manufacturer or the authors of the original APK.
 - **Coding and several service routines are simulations.** They show the workflow but do not write to a real vehicle. Applying coding is blocked outside demo mode.
-- **Generic OBD-II only for real hardware.** Mode 22 custom PIDs work if the ECU supports them. Manufacturer-specific modules, adaptations and security access are not implemented. In particular, generic OBD-II reads the engine control module only — direct TCM, ABS and airbag codes are not available without OEM diagnostics.
+- **Generic OBD-II is the baseline.** Mode 22 custom PIDs work if the ECU supports them. The experimental module scan can read TCM, ABS and airbag codes on some 11-bit CAN vehicles, but it is not a replacement for OEM diagnostics. Manufacturer adaptations, security access and module-specific clearing are not implemented.
+- **Module scan is best-effort.** Address maps are presets, not guarantees. A module may use a different address, a different diagnostic service, or a 29-bit CAN layout. ELM327 v1.5 clones may truncate multi-frame responses. The scan is read-only and never writes coding or adaptations.
 - **DTC descriptions are updatable, not live.** The built-in library and the downloadable code pack are maintained with app releases; the app never silently fetches code data in the background.
 - **Web Bluetooth cannot see classic Bluetooth adapters.** Use a BLE ELM327 or a USB serial cable.
 - **Fuel economy** is derived from the ECU fuel-rate PID when available; otherwise estimates are less accurate.

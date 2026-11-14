@@ -170,14 +170,14 @@ export const render = (view) => {
                 <span class="chip info">Library ${escapeHtml(lib.version)}</span>
                 <button class="btn btn-xs" id="setDtcUpdateBtn" type="button">${icon('refresh')}<span>Check for updates</span></button>
               </div>`)}
-            ${row('Transmission (TCM) codes', 'Generic OBD-II reads the engine control module (ECM/PCM) only. Direct TCM, ABS and airbag codes require manufacturer-specific diagnostics and are not read here.', `
-              <span class="chip warn">ECM only</span>`)}
+            ${row('Module scan (TCM / ABS / airbag)', 'Generic OBD-II reads the engine control module only. Diagnostics → Scan all modules probes the standard 11-bit CAN addresses with UDS or KWP2000. Read-only and experimental: some ELM327 v1.5 clones cannot reassemble multi-frame replies.', `
+              <span class="chip warn">Experimental</span>`)}
           `)}
 
           ${group('About', `
             <div class="settings-row">
               <div class="sr-text">
-                <b>AutoPulse OBD2 v1.2.0</b>
+                <b>AutoPulse OBD2 v1.3.0</b>
                 <span>Independent offline-capable OBD-II diagnostics PWA. Not affiliated with Car Scanner, ELM Electronics or any vehicle manufacturer.</span>
               </div>
               <div class="sr-control"><span class="chip accent">PWA</span></div>
@@ -187,7 +187,7 @@ export const render = (view) => {
               <div class="sr-control"><span class="chip info">${isNativeApp() ? 'Native' : 'Web APIs'}</span></div>
             </div>
             <div class="settings-row">
-              <div class="sr-text"><b>Diagnostic scope</b><span>Generic OBD-II (Mode 01, 02, 03, 04, 06, 07, 09, 0A) and user-defined Mode 22 PIDs. Manufacturer coding and some service routines are simulated demo catalogues and do not write to a real vehicle.</span></div>
+              <div class="sr-text"><b>Diagnostic scope</b><span>Generic OBD-II (Mode 01, 02, 03, 04, 06, 07, 09, 0A), user-defined Mode 22 PIDs, and an experimental read-only UDS/KWP module scan. Manufacturer coding and some service routines are simulated demo catalogues and do not write to a real vehicle.</span></div>
               <div class="sr-control"><span class="chip warn">Demo limits</span></div>
             </div>
             <div class="settings-row">

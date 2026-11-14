@@ -3,9 +3,9 @@
 import { DemoVehicle } from './simulator.js';
 import { SerialTransport, BleTransport } from './transport.js';
 import { PIDS, PIDS_BY_KEY, CORE_KEYS } from '../data/pids.js';
-import { lookupDtc } from '../data/dtc.js';
 import { parseHex, sleep, clamp } from '../core/utils.js';
 import { demoBytesFor } from '../data/custom.js';
+import { resolveModulePreset, scanElmModules } from './enhanced.js';
 
 const cleanResponse = (raw = '') =>
   String(raw)
@@ -56,6 +56,17 @@ class Elm327 {
     const test = await this.tryCommand('0100', 6000);
     if (!/[0-9A-F]{2}/i.test(test) && !/NO DATA|UNABLE/i.test(test)) {
       throw new Error('Adapter did not answer the OBD-II handshake. Check ignition and connection.');
+    }
+  }
+
+  /* Module probing changes the header, receive filter, protocol and timeout.
+   * ATD restores the adapter defaults; the normal init commands are then
+   * re-applied so live polling keeps working. */
+  async restoreDefaults() {
+    await this.tryCommand('ATD', 3000);
+    await sleep(150);
+    for (const cmd of ['ATE0', 'ATL0', 'ATS0', 'ATH0', 'ATAT1', 'ATSP0']) {
+      await this.tryCommand(cmd, 2000);
     }
   }
 
@@ -188,6 +199,7 @@ export class ObdConnection {
     this.extraPids = new Map();
     this.cursor = 0;
     this.busy = false;
+    this.paused = false;
     this.info = { adapter: 'Simulated ELM327', firmware: 'v1.5 (demo)', protocol: 'ISO 15765-4 CAN 11/500 (demo)' };
     this.vehicle = null;
     this.handlers = new Map();
@@ -223,6 +235,21 @@ export class ObdConnection {
 
   setPollRate(ms) {
     this.pollRate = Math.max(80, Number(ms) || 250);
+  }
+
+  pausePolling() {
+    this.paused = true;
+  }
+
+  resumePolling() {
+    this.paused = false;
+  }
+
+  async waitIdle(timeout = 4000) {
+    const start = Date.now();
+    while (this.busy && Date.now() - start < timeout) {
+      await sleep(60);
+    }
   }
 
   setExtraPids(list = []) {
@@ -326,7 +353,7 @@ export class ObdConnection {
   }
 
   async tick() {
-    if (this.busy || this.status !== 'connected') return;
+    if (this.paused || this.busy || this.status !== 'connected') return;
     this.busy = true;
     try {
       if (this.mode === 'demo' && this.sim) {
@@ -412,6 +439,47 @@ export class ObdConnection {
       mode06: [],
       scannedAt: Date.now(),
     };
+  }
+
+  /* Experimental direct module scan. Generic OBD-II only reaches the ECM;
+   * this probes the standard 11-bit CAN request/response pairs and asks each
+   * module for DTCs over UDS or KWP2000. Read-only. */
+  async scanModules() {
+    const preset = resolveModulePreset(this.vehicle || {});
+    if (this.mode === 'demo' && this.sim) {
+      await sleep(1400);
+      return {
+        modules: this.sim.getModuleScan(preset),
+        scannedAt: Date.now(),
+        preset: { id: preset.id, label: preset.label },
+        experimental: false,
+        demo: true,
+        adapter: this.info.adapter,
+        protocol: this.info.protocol,
+      };
+    }
+    if (!this.elm) throw new Error('Not connected to an adapter');
+
+    this.pausePolling();
+    try {
+      await this.waitIdle();
+      const modules = await scanElmModules(this.elm, preset, {
+        log: (dir, text) => this.log(dir, text),
+      });
+      return {
+        modules,
+        scannedAt: Date.now(),
+        preset: { id: preset.id, label: preset.label },
+        experimental: true,
+        demo: false,
+        adapter: this.info.adapter,
+        protocol: this.info.protocol,
+      };
+    } finally {
+      try { await this.elm?.restoreDefaults(); } catch { /* adapter may be gone */ }
+      this.resumePolling();
+      this.scheduleTick();
+    }
   }
 
   async clearDtcs() {

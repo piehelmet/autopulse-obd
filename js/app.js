@@ -1,6 +1,7 @@
 /* AutoPulse OBD2 — application bootstrap and hash router */
 
 import { getState, subscribe, activeVehicle } from './core/store.js';
+import { loadBundledDtcPack } from './data/dtc.js';
 import { hydrateIcons } from './core/icons.js';
 import { initTripRecorder } from './core/trips.js';
 import { connection } from './obd/connection.js';
@@ -202,6 +203,13 @@ const boot = () => {
       toast('Demo unavailable', { message: err.message, type: 'err' });
     });
   }
+
+  // Apply the code pack bundled with this release (or a newer one than the
+  // user already stored) so manufacturer/module descriptions work offline
+  // without a manual library update.
+  loadBundledDtcPack().then(() => {
+    if (currentRoute === 'diagnostics') renderRoute();
+  });
 };
 
 if (document.readyState === 'loading') {

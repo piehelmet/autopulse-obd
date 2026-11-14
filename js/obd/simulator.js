@@ -279,6 +279,48 @@ export class DemoVehicle {
     return MODE06_DEMO.map((m) => ({ ...m }));
   }
 
+  /* Simulated module scan. The active vehicle chooses the demo faults so a
+   * Camry preset demonstrates Toyota TCM codes and a Grand Caravan preset
+   * demonstrates 62TE codes. */
+  getModuleScan(preset) {
+    const make = String(this.vehicle?.make || '').toLowerCase();
+    const model = String(this.vehicle?.model || '').toLowerCase();
+    const isToyota = make.includes('toyota') && model.includes('camry');
+    const isDodge = (make.includes('dodge') || make.includes('chrysler')) && model.includes('caravan');
+
+    const moduleCodes = {
+      ecm: this.dtcs.map((dtc) => ({ ...dtc, module: 'ECM', ecu: 'ECM' })),
+      tcm: [],
+      abs: [],
+      srs: [],
+    };
+
+    if (isToyota) {
+      moduleCodes.tcm = [
+        { code: 'P2714', status: 'stored', module: 'TCM', ecu: 'TCM', failureType: 0x00, udsCode: 'P2714-00', statusByte: 0x2f },
+        { code: 'P2757', status: 'pending', module: 'TCM', ecu: 'TCM', failureType: 0x00, udsCode: 'P2757-00', statusByte: 0x07 },
+      ];
+    } else if (isDodge) {
+      moduleCodes.tcm = [
+        { code: 'P0796', status: 'stored', module: 'TCM', ecu: 'TCM', failureType: 0x00, udsCode: 'P0796-00', statusByte: 0x2f },
+        { code: 'P2800', status: 'pending', module: 'TCM', ecu: 'TCM', failureType: 0x00, udsCode: 'P2800-00', statusByte: 0x07 },
+      ];
+    } else {
+      moduleCodes.tcm = [
+        { code: 'P0730', status: 'pending', module: 'TCM', ecu: 'TCM', failureType: 0x00, udsCode: 'P0730-00', statusByte: 0x07 },
+      ];
+    }
+
+    return (preset?.modules || []).map((module) => ({
+      ...module,
+      present: true,
+      supported: true,
+      protocol: module.id === 'ecm' ? 'obd' : 'uds',
+      dtcs: moduleCodes[module.id] || [],
+      note: '',
+    }));
+  }
+
   encodeDtcResponse(prefix, list) {
     const bytes = list.slice(0, 3).map((d) => {
       const code = String(d.code || '').toUpperCase().replace(/[^0-9A-F]/g, '').padEnd(4, '0');

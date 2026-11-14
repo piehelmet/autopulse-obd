@@ -1,6 +1,6 @@
 /* AutoPulse OBD2 — offline service worker */
 
-const CACHE = 'autopulse-obd-v1.2.0';
+const CACHE = 'autopulse-obd-v1.3.0';
 const ASSETS = [
   './',
   './index.html',
@@ -25,6 +25,7 @@ const ASSETS = [
   './js/data/custom.js',
   './js/obd/simulator.js',
   './js/obd/transport.js',
+  './js/obd/enhanced.js',
   './js/obd/connection.js',
   './js/ui/components.js',
   './js/ui/charts.js',

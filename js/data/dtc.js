@@ -276,7 +276,7 @@ export const DTC_MAP = Object.fromEntries(DTC_DATABASE.map((x) => [x.code, x]));
 /* Built-in library version. Bump when DTC_DATABASE changes, and publish a
  * matching data/dtc-pack.json so installed apps can pull newer descriptions
  * without waiting for a full app update. */
-export const DTC_LIBRARY_VERSION = '2026.11';
+export const DTC_LIBRARY_VERSION = '2026.11.2';
 
 const PACK_KEY = 'autopulse.dtcPack.v1';
 const CODE_RE = /^[PCBU][0-9A-F]{4}$/;
@@ -292,7 +292,7 @@ export const dtcSystem = (code = '') => SYSTEM_NAMES[code.charAt(0).toUpperCase(
 
 const normalizeCode = (entry) => {
   const code = String(entry?.code || '').toUpperCase().trim();
-  return {
+  const norm = {
     code,
     description: String(entry?.description || 'No description available'),
     system: String(entry?.system || dtcSystem(code)),
@@ -300,7 +300,21 @@ const normalizeCode = (entry) => {
     causes: Array.isArray(entry?.causes) && entry.causes.length ? entry.causes.map(String) : ['Component fault', 'Wiring or connector issue', 'Control module fault'],
     symptoms: Array.isArray(entry?.symptoms) && entry.symptoms.length ? entry.symptoms.map(String) : ['Check engine light', 'Reduced performance'],
   };
+  const make = String(entry?.make || '').trim();
+  const model = String(entry?.model || '').trim();
+  const module = String(entry?.module || '').trim().toUpperCase();
+  if (make) norm.make = make;
+  if (model) norm.model = model;
+  if (module) norm.module = module;
+  return norm;
 };
+
+const normalizeContext = (context = {}) => ({
+  make: String(context.make || '').trim().toLowerCase(),
+  model: String(context.model || '').trim().toLowerCase(),
+  module: String(context.module || '').trim().toUpperCase(),
+  system: String(context.system || '').trim().toLowerCase(),
+});
 
 const readStoredPack = () => {
   try {
@@ -313,15 +327,28 @@ const readStoredPack = () => {
   }
 };
 
+/* Multiple entries may share a code when they describe different makes,
+ * models or modules (for example a Toyota P2714 and a generic P2714). */
+const buildPackIndex = (codes = []) => {
+  const index = {};
+  const seen = new Set();
+  for (const entry of codes) {
+    const norm = normalizeCode(entry);
+    if (!CODE_RE.test(norm.code)) continue;
+    const key = [norm.code, norm.make || '', norm.model || '', norm.module || ''].join('|').toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    (index[norm.code] ||= []).push(norm);
+  }
+  return index;
+};
+
 const initialPack = readStoredPack();
-let packMap = {};
+let packIndex = {};
 let packInfo = null;
 if (initialPack) {
-  for (const entry of initialPack.codes) {
-    const norm = normalizeCode(entry);
-    if (CODE_RE.test(norm.code)) packMap[norm.code] = norm;
-  }
-  if (Object.keys(packMap).length) {
+  packIndex = buildPackIndex(initialPack.codes);
+  if (Object.keys(packIndex).length) {
     packInfo = {
       version: String(initialPack.version || 'custom'),
       updatedAt: initialPack.updatedAt || null,
@@ -330,42 +357,89 @@ if (initialPack) {
   }
 }
 
-export const lookupDtc = (code) => {
-  const key = String(code || '').toUpperCase().trim();
-  if (packMap[key]) return packMap[key];
-  if (DTC_MAP[key]) return DTC_MAP[key];
-  const system = dtcSystem(key);
-  return {
-    code: key,
-    description: 'Manufacturer-specific or undocumented trouble code',
-    system,
-    severity: 'medium',
-    causes: ['Component fault', 'Wiring or connector issue', 'Control module fault'],
-    symptoms: ['Check engine light', 'Reduced performance'],
-  };
+const scoreEntry = (entry, ctx) => {
+  let score = 0;
+  const make = String(entry.make || '').toLowerCase();
+  const model = String(entry.model || '').toLowerCase();
+  const module = String(entry.module || '').toUpperCase();
+  if (make) {
+    if (!ctx.make || make !== ctx.make) return -1;
+    score += 4;
+  }
+  if (model) {
+    if (!ctx.model || !ctx.model.includes(model)) return -1;
+    score += 2;
+  }
+  if (module) {
+    if (!ctx.module || module !== ctx.module) return -1;
+    score += 3;
+  }
+  if (entry.system && ctx.system && entry.system.toLowerCase() === ctx.system) score += 1;
+  return score;
 };
 
-export const dtcLibraryInfo = () => ({
-  version: DTC_LIBRARY_VERSION,
-  builtIn: DTC_DATABASE.length,
-  downloaded: Object.keys(packMap).length,
-  packVersion: packInfo?.version || null,
-  packUpdatedAt: packInfo?.updatedAt || null,
-  packSource: packInfo?.source || null,
+const fallbackDtc = (key) => ({
+  code: key,
+  description: 'Manufacturer-specific or undocumented trouble code',
+  system: dtcSystem(key),
+  severity: 'medium',
+  causes: ['Component fault', 'Wiring or connector issue', 'Control module fault'],
+  symptoms: ['Check engine light', 'Reduced performance'],
+  source: 'fallback',
 });
+
+/* Look up a code with optional vehicle context:
+ *   lookupDtc('P2714', { make: 'Toyota', model: 'Camry', module: 'TCM' })
+ * A matching make/model/module entry beats a generic one; a mismatch is
+ * ignored so a Dodge code never shows Toyota-specific text. */
+export const lookupDtc = (code, context = {}) => {
+  const key = String(code || '').toUpperCase().trim();
+  const ctx = normalizeContext(context);
+  const candidates = packIndex[key] || [];
+  let best = null;
+  let bestScore = -1;
+  for (const entry of candidates) {
+    const score = scoreEntry(entry, ctx);
+    if (score > bestScore) {
+      best = entry;
+      bestScore = score;
+    }
+  }
+  if (best && bestScore >= 0) return { ...best, source: 'pack' };
+  if (DTC_MAP[key]) return { ...DTC_MAP[key], source: 'builtin' };
+
+  const generic = candidates.find((entry) => !entry.make && !entry.model && !entry.module);
+  if (generic) return { ...generic, source: 'pack' };
+
+  // Without a vehicle profile there is nothing to score against. Return the
+  // first pack entry but flag it so the UI can show the vehicle scope.
+  if (!ctx.make && !ctx.model && !ctx.module && candidates.length) {
+    return { ...candidates[0], source: 'pack', contextMismatch: true };
+  }
+  return fallbackDtc(key);
+};
+
+export const dtcLibraryInfo = () => {
+  const entries = Object.values(packIndex).flat();
+  return {
+    version: DTC_LIBRARY_VERSION,
+    builtIn: DTC_DATABASE.length,
+    downloaded: entries.length,
+    downloadedCodes: Object.keys(packIndex).length,
+    packVersion: packInfo?.version || null,
+    packUpdatedAt: packInfo?.updatedAt || null,
+    packSource: packInfo?.source || null,
+  };
+};
 
 /* Validate and install a downloaded pack. Throws on unusable input. */
 export const applyDtcPack = (pack) => {
   if (!pack || !Array.isArray(pack.codes)) throw new Error('Code pack is not a valid AutoPulse pack');
-  const next = {};
-  for (const entry of pack.codes) {
-    const norm = normalizeCode(entry);
-    if (CODE_RE.test(norm.code)) next[norm.code] = norm;
-  }
-  const count = Object.keys(next).length;
-  if (!count) throw new Error('Code pack contains no usable trouble codes');
+  const next = buildPackIndex(pack.codes);
+  const entries = Object.values(next).flat();
+  if (!entries.length) throw new Error('Code pack contains no usable trouble codes');
 
-  packMap = next;
+  packIndex = next;
   packInfo = {
     version: String(pack.version || 'custom'),
     updatedAt: pack.updatedAt || null,
@@ -376,19 +450,50 @@ export const applyDtcPack = (pack) => {
       version: packInfo.version,
       updatedAt: packInfo.updatedAt,
       source: packInfo.source,
-      codes: Object.values(next),
+      codes: entries,
     }));
   } catch {
     /* storage full or unavailable: the pack still applies for this session */
   }
-  return { ...dtcLibraryInfo(), count };
+  return { ...dtcLibraryInfo(), count: entries.length };
 };
 
 export const clearDtcPack = () => {
-  packMap = {};
+  packIndex = {};
   packInfo = null;
   try { localStorage.removeItem(PACK_KEY); } catch { /* ignore */ }
   return dtcLibraryInfo();
+};
+
+const versionParts = (value) => String(value || '').split('.').map((part) => Number(part));
+const numericVersion = (parts) => parts.length > 0 && parts.every((n) => Number.isFinite(n));
+const isNewerVersion = (a, b) => {
+  const pa = versionParts(a);
+  const pb = versionParts(b);
+  if (!numericVersion(pa) || !numericVersion(pb)) return false;
+  const length = Math.max(pa.length, pb.length);
+  for (let i = 0; i < length; i += 1) {
+    const x = pa[i] || 0;
+    const y = pb[i] || 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+};
+
+/* Load the pack bundled with the app when the user has no pack yet, or when
+ * the bundled pack is a newer numeric version than the stored one. A stored
+ * custom pack (non-numeric version) is never overwritten automatically. */
+export const loadBundledDtcPack = async () => {
+  try {
+    const url = new URL('../../data/dtc-pack.json', import.meta.url);
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return dtcLibraryInfo();
+    const pack = await res.json();
+    if (packInfo && !isNewerVersion(pack.version, packInfo.version)) return dtcLibraryInfo();
+    return applyDtcPack(pack);
+  } catch {
+    return dtcLibraryInfo();
+  }
 };
 
 

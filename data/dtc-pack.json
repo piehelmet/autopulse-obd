@@ -1,8 +1,8 @@
 {
-  "version": "2026.11.1",
+  "version": "2026.11.2",
   "updatedAt": "2026-11-13",
-  "source": "AutoPulse transmission supplement",
-  "notes": "Generic SAE J2012 transmission-related powertrain codes. These are stored in the engine control module when the transmission control module requests the MIL. Reading codes directly from a TCM requires manufacturer-specific diagnostics.",
+  "source": "AutoPulse transmission and module supplement",
+  "notes": "Generic SAE J2012 transmission codes plus make/model/module-specific descriptions for the 2011 Toyota Camry 2AR-FE/U760E and the 2008 Dodge Grand Caravan 62TE. Entries with make/model/module fields are only used when the active vehicle or module scan matches them.",
   "codes": [
     {
       "code": "P0700",
@@ -163,6 +163,105 @@
       "severity": "medium",
       "causes": ["Weak battery", "Corroded power feed", "Blown TCM fuse"],
       "symptoms": ["No communication with TCM", "Harsh shifts", "No start in some vehicles"]
+    },
+    {
+      "code": "P2714",
+      "description": "Pressure control solenoid D performance or stuck off (Toyota SLT linear solenoid)",
+      "system": "Transmission",
+      "severity": "high",
+      "make": "Toyota",
+      "model": "Camry",
+      "module": "TCM",
+      "causes": ["Sticking SLT linear solenoid", "Valve body wear or contamination", "Low or degraded ATF", "SLT solenoid circuit fault"],
+      "symptoms": ["Harsh or delayed shifts", "Transmission slipping", "MIL on", "Limp mode"]
+    },
+    {
+      "code": "P2757",
+      "description": "Torque converter clutch pressure control solenoid performance (Toyota SLU linear solenoid)",
+      "system": "Transmission",
+      "severity": "high",
+      "make": "Toyota",
+      "model": "Camry",
+      "module": "TCM",
+      "causes": ["Sticking SLU linear solenoid", "TCC hydraulic circuit leak", "Valve body wear", "Degraded ATF"],
+      "symptoms": ["Shudder at light throttle", "Poor fuel economy", "Torque converter clutch not engaging", "MIL on"]
+    },
+    {
+      "code": "P0741",
+      "description": "Torque converter clutch stuck off (Toyota U760E SLU circuit)",
+      "system": "Transmission",
+      "severity": "medium",
+      "make": "Toyota",
+      "model": "Camry",
+      "module": "TCM",
+      "causes": ["SLU solenoid stuck off", "TCC seal or circuit leak", "Valve body wear", "Low fluid level"],
+      "symptoms": ["No torque converter lockup", "Higher cruise RPM", "Reduced fuel economy", "MIL on"]
+    },
+    {
+      "code": "P0894",
+      "description": "Transmission component slipping (U760E clutch or pressure loss)",
+      "system": "Transmission",
+      "severity": "high",
+      "make": "Toyota",
+      "model": "Camry",
+      "module": "TCM",
+      "causes": ["Worn clutch packs", "Low line pressure", "Valve body fault", "Low or burnt fluid"],
+      "symptoms": ["Slipping during acceleration", "Harsh shifts", "Limp mode", "Burning fluid smell"]
+    },
+    {
+      "code": "P2800",
+      "description": "Transmission range sensor B circuit (62TE PRNDL input)",
+      "system": "Transmission",
+      "severity": "high",
+      "make": "Dodge",
+      "model": "Grand Caravan",
+      "module": "TCM",
+      "causes": ["TRS B circuit open or shorted", "Internal range sensor connector fault", "Solenoid pack or valve body connector", "Low fluid level"],
+      "symptoms": ["No start in Park or Neutral", "Wrong gear indicated", "Limp mode", "MIL on"]
+    },
+    {
+      "code": "P0796",
+      "description": "Pressure control solenoid C performance or stuck off (62TE solenoid pack)",
+      "system": "Transmission",
+      "severity": "high",
+      "make": "Dodge",
+      "model": "Grand Caravan",
+      "module": "TCM",
+      "causes": ["Pressure control solenoid C stuck off", "Solenoid pack fault", "Valve body contamination", "Low fluid level"],
+      "symptoms": ["Slipping under load", "Harsh shifts", "Limp mode", "MIL on"]
+    },
+    {
+      "code": "P0846",
+      "description": "Transmission fluid pressure sensor / switch B range or performance (62TE 2/4 pressure switch)",
+      "system": "Transmission",
+      "severity": "high",
+      "make": "Dodge",
+      "model": "Grand Caravan",
+      "module": "TCM",
+      "causes": ["2/4 pressure switch fault", "Solenoid pack connector fault", "Low fluid level", "Internal hydraulic leak"],
+      "symptoms": ["Limp mode", "Harsh or delayed shifts", "MIL on", "Poor shift quality"]
+    },
+    {
+      "code": "P0871",
+      "description": "Transmission fluid pressure sensor / switch C range or performance (62TE 3/4 pressure switch)",
+      "system": "Transmission",
+      "severity": "high",
+      "make": "Dodge",
+      "model": "Grand Caravan",
+      "module": "TCM",
+      "causes": ["3/4 pressure switch fault", "Solenoid pack fault", "Low line pressure", "Valve body wear"],
+      "symptoms": ["Limp mode", "No 3rd or 4th gear", "Harsh shifts", "MIL on"]
+    },
+    {
+      "code": "P0944",
+      "description": "Hydraulic pressure unit loss of pressure (62TE loss of pump prime)",
+      "system": "Transmission",
+      "severity": "high",
+      "make": "Dodge",
+      "model": "Grand Caravan",
+      "module": "TCM",
+      "causes": ["Loss of pump prime", "Low fluid level", "Filter seal or pickup leak", "Internal hydraulic pressure leak"],
+      "symptoms": ["No movement after start", "Slipping", "Limp mode", "MIL on"]
     }
   ]
 }
