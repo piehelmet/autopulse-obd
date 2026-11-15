@@ -14,7 +14,7 @@ Open **<https://piehelmet.github.io/autopulse-obd/>** in Chrome or Edge. Install
 
 ### Install the Android APK
 
-Download **[AutoPulse-OBD2-1.3.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.3.0/AutoPulse-OBD2-1.3.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser or file manager when prompted.
+Download **[AutoPulse-OBD2-1.4.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.4.0/AutoPulse-OBD2-1.4.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser or file manager when prompted.
 
 The APK is a self-contained native app. Every asset is bundled inside it, so it works with no internet connection at all — even on first launch. It does **not** use the Chrome app, has no URL bar, and does not depend on GitHub Pages being reachable. Bluetooth ELM327 adapters are reached through the Android Bluetooth LE stack directly.
 
