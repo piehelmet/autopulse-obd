@@ -190,7 +190,7 @@ export const render = (view) => {
           ${group('About', `
             <div class="settings-row">
               <div class="sr-text">
-                <b>AutoPulse OBD2 v1.5.0</b>
+                <b>AutoPulse OBD2 v1.6.0</b>
                 <span>Independent offline-capable OBD-II diagnostics PWA. Not affiliated with Car Scanner, ELM Electronics or any vehicle manufacturer.</span>
               </div>
               <div class="sr-control"><span class="chip accent">PWA</span></div>

@@ -1,6 +1,6 @@
 /* AutoPulse OBD2 — service functions and manufacturer coding */
 
-import { getState, setState, addServiceRecord } from '../core/store.js';
+import { getState, setState, addServiceRecord, activeVehicle } from '../core/store.js';
 import { SERVICE_FUNCTIONS, CODING_BRANDS } from '../data/vehicles.js';
 import { icon } from '../core/icons.js';
 import { pageHead, modal, toast, confirmDialog, emptyState, tabs } from './components.js';
@@ -9,6 +9,11 @@ import { escapeHtml, fmtDate, sleep } from '../core/utils.js';
 
 let activeTab = 'service';
 let activeBrand = 'vag';
+
+const vehicleLink = () => {
+  const vehicle = activeVehicle();
+  return { vehicleId: vehicle?.id || null, vin: vehicle?.vin || '' };
+};
 
 export const render = (view) => {
   const build = () => {
@@ -217,6 +222,7 @@ const runService = async (fn, done) => {
         module: fn.module,
         status: 'completed',
         mode: connection.mode,
+        ...vehicleLink(),
       });
       setTimeout(() => {
         api.close();
@@ -278,7 +284,7 @@ const applyCoding = async (brandId, done) => {
     }
     if (elapsed >= duration) {
       clearInterval(timer);
-      addServiceRecord({ name: `${brand.name} coding`, module: 'Coding & adaptations', status: 'applied', mode: 'demo' });
+      addServiceRecord({ name: `${brand.name} coding`, module: 'Coding & adaptations', status: 'applied', mode: 'demo', ...vehicleLink() });
       setTimeout(() => {
         api.close();
         done();

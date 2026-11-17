@@ -5,11 +5,13 @@ import { PIDS, PIDS_BY_KEY, getPid, CORE_KEYS } from '../data/pids.js';
 import { allCustomPids } from '../data/custom.js';
 import { displayPid, formatDistance, rangeKm, consumption, units } from '../core/display.js';
 import { getHistory, lastN } from '../core/history.js';
+import { collectVehicleHistory } from '../core/vehicle-history.js';
 import { icon } from '../core/icons.js';
 import { pageHead, modal, toast, confirmDialog, emptyState, field } from './components.js';
 import { drawGauge, drawLineChart, palette } from './charts.js';
 import { connection } from '../obd/connection.js';
 import { openConnectionModal } from './settings.js';
+import { openVehicleDetails } from './vehicle-details.js';
 import { escapeHtml, uid, clamp } from '../core/utils.js';
 
 const COLORS = () => {
@@ -68,9 +70,20 @@ export const render = (view) => {
     const connecting = connection.status === 'connecting';
     const last = s.lastConnection;
     const lastLabel = last?.name || (last?.mode === 'serial' ? 'USB adapter' : 'Bluetooth adapter');
+    const history = collectVehicleHistory(s, vehicle);
+    const specs = vehicle.vinSpecs || null;
+    const specChip = specs
+      ? [specs.engineModel, specs.displacementL ? `${specs.displacementL} L` : '', specs.engineHp ? `${specs.engineHp} hp` : ''].filter(Boolean).join(' · ') || specs.bodyClass || 'Specs decoded'
+      : vehicle.vin ? 'Specs not decoded' : 'Add a VIN';
+    const recallCount = Array.isArray(vehicle.vinRecalls) ? vehicle.vinRecalls.length : 0;
+    const identity = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
+    const identityLabel = vehicle.make || vehicle.model ? identity : 'Add make and model in the Garage';
+    const tripLabel = `${history.stats.tripCount} trip${history.stats.tripCount === 1 ? '' : 's'}`;
+    const serviceLabel = `${history.stats.serviceCount} service`;
 
     view.innerHTML = `
       ${pageHead('Dashboard', `Live telemetry · ${vehicle.name}`, `
+        <button class="btn btn-sm" data-garage type="button">${icon('car')}<span>Garage</span></button>
         ${connected
           ? (demoMode ? `<button class="btn btn-sm" id="dashDemoBtn" type="button">${icon('sliders')}<span>Demo drive</span></button>` : '')
           : `<button class="btn btn-sm btn-primary" data-connect type="button">${icon('link')}<span>Connect</span></button>`}
@@ -94,6 +107,30 @@ export const render = (view) => {
             </div>
           </div>
         </div>`}
+      <div class="garage-cta">
+        <div class="gc-ico">${icon('car')}</div>
+        <div class="gc-body">
+          <div class="gc-title">
+            ${escapeHtml(vehicle.name || `${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'My vehicle')}
+            ${vehicle.id === s.activeVehicleId ? '<span class="badge accent">Active</span>' : ''}
+          </div>
+          <div class="gc-sub">
+            ${escapeHtml(identityLabel)}
+            ${vehicle.vin ? ` · <span class="mono">${escapeHtml(vehicle.vin)}</span>` : ' · No VIN saved'}
+          </div>
+          <div class="gc-chips">
+            <span class="chip ${specs ? 'info' : ''}">${icon('info')}<span>${escapeHtml(specChip)}</span></span>
+            ${recallCount
+              ? `<span class="chip warn">${icon('alert')}<span>${recallCount} recall${recallCount === 1 ? '' : 's'}</span></span>`
+              : vehicle.vinRecallsAt ? `<span class="chip ok">${icon('check')}<span>No recalls</span></span>` : ''}
+            <span class="chip">${icon('route')}<span>${tripLabel} · ${serviceLabel}</span></span>
+          </div>
+        </div>
+        <div class="gc-actions">
+          <button class="btn btn-sm btn-primary" data-vehicle-details type="button">${icon('info')}<span>Specs &amp; history</span></button>
+          <button class="btn btn-sm" data-garage type="button">${icon('car')}<span>Open Garage</span></button>
+        </div>
+      </div>
       <div class="grid grid-4" style="margin-bottom:14px">
         <div class="kpi">
           <div class="k-label">${icon('map')} Estimated range</div>
@@ -146,6 +183,16 @@ export const render = (view) => {
   };
 
   const bind = (root, dash) => {
+    root.querySelectorAll('[data-garage]').forEach((btn) => {
+      btn.addEventListener('click', () => { location.hash = '#/garage'; });
+    });
+    root.querySelectorAll('[data-vehicle-details]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const vehicle = activeVehicle();
+        if (vehicle) openVehicleDetails(vehicle.id, { onChange: refresh });
+      });
+    });
+
     root.querySelector('#dashAddBtn')?.addEventListener('click', () => openWidgetModal(null, refresh));
     root.querySelector('#dashEditBtn')?.addEventListener('click', () => {
       editing = !editing;

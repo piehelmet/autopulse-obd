@@ -538,6 +538,56 @@ input[type=range]{width:100%;accent-color:var(--accent);height:20px}
 .callout.warn .ico{color:var(--warn)}
 .callout.danger{border-color:rgba(255,77,94,.22);background:rgba(255,77,94,.06)}
 .callout.danger .ico{color:var(--danger)}
+.callout.ok{border-color:rgba(57,224,138,.22);background:rgba(57,224,138,.06)}
+.callout.ok .ico{color:var(--ok)}
+
+/* ---------- garage shortcut and vehicle details ---------- */
+.chip .ico{width:12px;height:12px}
+.chip .ico svg{width:12px;height:12px}
+.garage-cta{
+  display:flex;align-items:center;gap:14px;padding:14px 16px;margin-bottom:14px;
+  border:1px solid var(--line);border-radius:14px;background:linear-gradient(160deg,var(--panel-2),var(--panel));
+  position:relative;overflow:hidden;
+}
+.garage-cta::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(420px 120px at 10% 0%,rgba(var(--accent-rgb),.08),transparent 70%)}
+.gc-ico{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex:0 0 42px;background:rgba(var(--accent-rgb),.1);border:1px solid rgba(var(--accent-rgb),.22);color:var(--accent);position:relative;z-index:1}
+.gc-ico .ico,.gc-ico .ico svg{width:22px;height:22px}
+.gc-body{min-width:0;flex:1;position:relative;z-index:1}
+.gc-title{font-size:14.5px;font-weight:750;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gc-sub{font-size:11.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gc-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.gc-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;position:relative;z-index:1}
+.vehicle-title{font-size:19px;letter-spacing:-.4px}
+.vehicle-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:4px}
+.vehicle-stats>div{padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);min-width:0}
+.vehicle-stats b{display:block;font-family:var(--mono);font-size:16px;line-height:1.1}
+.vehicle-stats span{display:block;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist-list{display:flex;flex-direction:column;margin-top:10px;border-top:1px solid var(--line)}
+.hist-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(29,46,61,.55);min-width:0}
+.hist-item:last-child{border-bottom:0}
+.hist-ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:0 0 30px;background:var(--panel-3);color:var(--muted)}
+.hist-ico .ico,.hist-ico .ico svg{width:15px;height:15px}
+.hist-ico.trip{color:var(--accent-2);background:rgba(77,163,255,.1)}
+.hist-ico.service{color:var(--accent);background:rgba(var(--accent-rgb),.1)}
+.hist-ico.perf{color:var(--warn);background:rgba(255,176,32,.1)}
+.hist-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.hist-body b{font-size:12px;font-weight:700}
+.hist-meta{text-align:right;flex:0 0 auto;display:flex;flex-direction:column;gap:2px}
+.hist-meta b{font-family:var(--mono);font-size:11.5px}
+.hist-meta span{font-size:10px;color:var(--muted)}
+.recall-list{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow:auto;padding-right:2px}
+.recall-item{padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2)}
+.recall-item p{margin:6px 0 0;line-height:1.45}
+.vin-lookup{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--panel)}
+.vin-status{margin-top:3px;line-height:1.45}
+.vin-status.ok{color:var(--ok)}
+.vin-status.warn{color:var(--warn)}
+.vin-status.info{color:var(--accent-2)}
+.vin-preview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:10px}
+.vin-preview>div{padding:7px 9px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);min-width:0}
+.vin-preview span{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700}
+.vin-preview b{display:block;font-size:11.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
 
 /* ---------- HUD ---------- */
 .hud-overlay{position:fixed;inset:0;z-index:200;background:#000;display:flex;align-items:center;justify-content:center;transform:scaleX(-1);cursor:pointer}
@@ -568,7 +618,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:20px}
     background:rgba(8,14,20,.96);border-top:1px solid var(--line);backdrop-filter:blur(16px);justify-content:space-around;align-items:center;
   }
   [data-theme="light"] .mobile-nav{background:rgba(255,255,255,.97)}
-  .mobile-nav a{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:9.5px;font-weight:700;padding:5px 10px;border-radius:9px;min-width:52px}
+  .mobile-nav a{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:9px;font-weight:700;padding:5px 4px;border-radius:9px;min-width:0;flex:1;max-width:76px}
   .mobile-nav a.active{color:var(--accent);background:rgba(var(--accent-rgb),.08)}
   .mobile-nav .ico{width:21px;height:21px}
   .mobile-nav .ico svg{width:21px;height:21px}
@@ -601,6 +651,11 @@ input[type=range]{width:100%;accent-color:var(--accent);height:20px}
   .modal-body{padding:14px}
   .hud-inner{grid-template-columns:1fr;gap:6vh}
   .hud-hint{display:none}
+  .garage-cta{align-items:flex-start;flex-wrap:wrap}
+  .gc-actions{width:100%;justify-content:flex-start}
+  .gc-sub{white-space:normal}
+  .vehicle-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .vin-preview{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:520px){
   .dash-grid{grid-auto-rows:104px}
@@ -612,6 +667,8 @@ input[type=range]{width:100%;accent-color:var(--accent);height:20px}
   .icon-btn{width:34px;height:34px}
   .grid-4{grid-template-columns:1fr 1fr}
   .perf-time{font-size:64px;letter-spacing:-3px}
+  .vehicle-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .vin-preview{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important}

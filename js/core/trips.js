@@ -3,6 +3,7 @@
 import { connection } from '../obd/connection.js';
 import { addTrip, getState, activeVehicle } from './store.js';
 import { clamp } from './utils.js';
+import { normalizeVin } from '../data/vin.js';
 
 export const trip = {
   active: false,
@@ -20,6 +21,7 @@ export const trip = {
   lastSampleAt: 0,
   vehicleId: null,
   vehicleName: '',
+  vin: '',
 };
 
 let lastStopAt = 0;
@@ -41,6 +43,7 @@ const reset = () => {
   trip.lastSampleAt = 0;
   trip.vehicleId = null;
   trip.vehicleName = '';
+  trip.vin = '';
   idleTimer = 0;
 };
 
@@ -54,6 +57,7 @@ export const startTrip = ({ auto = false } = {}) => {
   trip.lastAt = trip.startedAt;
   trip.vehicleId = v?.id || null;
   trip.vehicleName = v ? `${v.make} ${v.model}` : 'Vehicle';
+  trip.vin = normalizeVin(v?.vin || '');
   trip.startFuel = connection.values.fuelLevel ?? null;
   return trip;
 };
@@ -80,6 +84,7 @@ export const stopTrip = () => {
     endFuel: connection.values.fuelLevel ?? null,
     vehicleId: trip.vehicleId,
     vehicleName: trip.vehicleName,
+    vin: trip.vin,
     samples: {
       t: [...trip.samples.t],
       speed: [...trip.samples.speed],

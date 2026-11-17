@@ -233,6 +233,7 @@ export const render = (view) => {
     phase = 'done';
     const u = units();
     const value = Math.max(0.01, elapsed);
+    const vehicle = activeVehicle();
     result = {
       testId: selected.id,
       label: selected.label,
@@ -240,7 +241,9 @@ export const render = (view) => {
       maxSpeedKmh: maxSpeedRun,
       splits: { ...splits },
       distanceM: selected.kind === 'distance' ? QUARTER_MILE : distanceM,
-      vehicleName: activeVehicle() ? `${activeVehicle().make} ${activeVehicle().model}` : 'Vehicle',
+      vehicleId: vehicle?.id || null,
+      vin: vehicle?.vin || '',
+      vehicleName: vehicle ? `${vehicle.make} ${vehicle.model}` : 'Vehicle',
       mode: connection.mode,
       ...extra,
     };

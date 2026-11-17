@@ -3,7 +3,7 @@
 import { uid, debounce } from './utils.js';
 
 const KEY = 'autopulse.state.v1';
-const VERSION = 2;
+const VERSION = 3;
 
 const starterVehicle = () => ({
   id: 'veh_default',
@@ -12,6 +12,10 @@ const starterVehicle = () => ({
   model: '',
   year: new Date().getFullYear(),
   vin: '',
+  vinSpecs: null,
+  vinDecodedAt: null,
+  vinRecalls: [],
+  vinRecallsAt: null,
   plate: '',
   fuel: 'Gasoline',
   tank: 55,
@@ -99,6 +103,19 @@ const load = () => {
     for (const k of ['vehicles', 'dashboards', 'trips', 'perfResults', 'serviceHistory', 'favorites', 'customPids']) {
       if (!Array.isArray(merged[k])) merged[k] = base[k];
     }
+    // v3: VIN-decoded specs and recall results live on the vehicle profile so
+    // they stay available offline. Add empty defaults to older profiles.
+    merged.vehicles = merged.vehicles.map((vehicle) => {
+      const normalized = {
+        vinSpecs: null,
+        vinDecodedAt: null,
+        vinRecalls: [],
+        vinRecallsAt: null,
+        ...vehicle,
+      };
+      if (!Array.isArray(normalized.vinRecalls)) normalized.vinRecalls = [];
+      return normalized;
+    });
     // v2: the demo is opt-in. Older installs auto-started the simulator, which
     // made the demo look like the default vehicle.
     if ((Number(saved.version) || 1) < 2) {

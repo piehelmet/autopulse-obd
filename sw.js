@@ -1,6 +1,6 @@
 /* AutoPulse OBD2 — offline service worker */
 
-const CACHE = 'autopulse-obd-v1.5.0';
+const CACHE = 'autopulse-obd-v1.6.0';
 const ASSETS = [
   './',
   './index.html',
@@ -18,8 +18,10 @@ const ASSETS = [
   './js/core/display.js',
   './js/core/history.js',
   './js/core/trips.js',
+  './js/core/vehicle-history.js',
   './js/data/pids.js',
   './js/data/dtc.js',
+  './js/data/vin.js',
   './data/dtc-pack.json',
   './js/data/vehicles.js',
   './js/data/custom.js',
@@ -37,6 +39,7 @@ const ASSETS = [
   './js/ui/service.js',
   './js/ui/terminal.js',
   './js/ui/garage.js',
+  './js/ui/vehicle-details.js',
   './js/ui/settings.js',
   './js/ui/hud.js',
 ];

@@ -14,7 +14,7 @@ Open **<https://piehelmet.github.io/autopulse-obd/>** in Chrome or Edge. Install
 
 ### Install the Android APK
 
-Download **[AutoPulse-OBD2-1.5.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.5.0/AutoPulse-OBD2-1.5.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser or file manager when prompted.
+Download **[AutoPulse-OBD2-1.6.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.6.0/AutoPulse-OBD2-1.6.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser or file manager when prompted.
 
 The APK is a self-contained native app. Every asset is bundled inside it, so it works with no internet connection at all — even on first launch. It does **not** use the Chrome app, has no URL bar, and does not depend on GitHub Pages being reachable. Bluetooth ELM327 adapters are reached through the Android Bluetooth LE stack directly.
 
@@ -73,7 +73,7 @@ How the Bluetooth picker appears depends on where you run the app:
 | Service functions (oil reset, EPB, DPF, ABS bleed, etc.) | Demo-simulated | Full UI and guided routines; no OEM write commands are sent to a real vehicle. |
 | Manufacturer coding / long coding | Demo-simulated | VAG, Toyota and Renault catalogues are demonstration data. Real coding needs licensed OEM protocols. |
 | Raw ELM327 terminal | Implemented | AT and OBD commands, history, quick commands, copy/save log. |
-| Vehicle profiles / garage | Implemented | Presets, VIN, tank, odometer, notes and per-vehicle trip stats. |
+| Vehicle profiles / garage | Implemented | Presets, VIN, tank, odometer, notes and per-vehicle trip stats. A complete VIN loads manufacturer specs and NHTSA safety recalls automatically, and the profile is reachable from the dashboard. |
 | HUD / mirrored display | Implemented | Configurable primary and secondary metric. |
 | Dark / light / classic theme, metric / imperial units | Implemented | Persisted locally. Classic swaps the gauges for analogue dials with a warm instrument-panel palette. |
 | Local backup / restore | Implemented | Full JSON export and import. |
@@ -96,7 +96,7 @@ How the Bluetooth picker appears depends on where you run the app:
 - **Performance** — staged tests, automatic timing, personal bests and result history.
 - **Service & coding** — 12 guided service routines and manufacturer coding catalogues (clearly marked simulated).
 - **Terminal** — raw ELM327 command console with logging.
-- **Garage** — vehicle profiles, presets and active vehicle selection.
+- **Garage** — vehicle profiles, presets, active vehicle selection, VIN decoding, manufacturer specs, NHTSA safety recalls and per-vehicle history.
 - **Settings** — connection setup, polling, units, theme (dark, light, classic analogue), HUD metrics, fuel price, code-library updates, backup/restore and data erase.
 
 ### Themes
@@ -106,6 +106,16 @@ The theme picker in **Settings → Units & display** offers three looks:
 - **Dark** — the default high-contrast night palette.
 - **Light** — bright daylight palette.
 - **Classic** — warm walnut and brass instrument-panel palette with analogue gauges: cream dial faces, chrome bezels, serif numerals, a red needle and an odometer-style digital readout. The choice is saved with the rest of the app state.
+
+### Garage, VIN specs and history
+
+The Garage is one tap from the dashboard header, the dashboard vehicle card and the mobile bottom bar. Each profile stores a VIN, plate, tank capacity, odometer and notes, and keeps its own trip and service totals.
+
+Enter a complete 17-character VIN in the Garage and AutoPulse fills the make, model, year and fuel type, then loads manufacturer specifications from the official **NHTSA vPIC** service: body class, engine code and displacement, power, transmission, drive type, plant and airbag locations. The same profile also checks **NHTSA safety recalls** for the decoded make, model and year. Both results are cached on the vehicle profile, so specs and recalls stay visible offline until you refresh them.
+
+The **Specs & history** view combines those official results with records this device actually captured — trips, service routines and performance runs. Records are matched to a vehicle by profile ID first, then by VIN, so a car keeps its history if a profile is recreated. Older records that were never tagged with a vehicle are deliberately not attributed, because guessing would invent history.
+
+> NHTSA publishes safety recalls, not accident, owner or paid service-history reports. Specs and recalls are a guide, not a substitute for the manufacturer's build sheet or a dealer recall check by VIN.
 
 ### Diagnostic code library
 
@@ -149,8 +159,8 @@ autopulse-obd/
 ├─ assets/                    Original SVG + generated PNG icons
 └─ js/
    ├─ app.js                  Bootstrap, router, status chrome
-   ├─ core/                   utils, icons, store, display, history, trip recorder
-   ├─ data/                   PIDs, DTCs, vehicle presets, service/coding catalogues
+   ├─ core/                   utils, icons, store, display, history, trip recorder, vehicle history
+   ├─ data/                   PIDs, DTCs, VIN decoding, vehicle presets, service/coding catalogues
    ├─ obd/                    simulator, serial/BLE transports, ELM327 connection, module scan
    └─ ui/                     one module per screen + shared components/charts/HUD
 ```
@@ -176,6 +186,7 @@ source of truth: rebuild the APK after changing anything here.
 - **Generic OBD-II is the baseline.** Mode 22 custom PIDs work if the ECU supports them. The experimental module scan can read TCM, ABS and airbag codes on some 11-bit CAN vehicles, but it is not a replacement for OEM diagnostics. Manufacturer adaptations, security access and module-specific clearing are not implemented.
 - **Module scan is best-effort.** Address maps are presets, not guarantees. A module may use a different address, a different diagnostic service, or a 29-bit CAN layout. ELM327 v1.5 clones may truncate multi-frame responses. The scan is read-only and never writes coding or adaptations.
 - **Immobilizer support is read-only and limited.** The SKREEM/WCM address is a best-effort candidate, and immobilizer codes are only as complete as the module's reply. AutoPulse never programs or clones keys or fobs, retrieves PIN/SKIM secrets, performs security access or pairs modules. Use a dealer, automotive locksmith or owner-authorized programmer for key work.
+- **VIN specs and recalls come from NHTSA public data.** Decoding and recall checks need a network connection the first time; cached results then work offline. NHTSA does not publish accident, owner or paid service-history reports, and its recall list is not proof a car has no recalls — a dealer VIN check is authoritative.
 - **DTC descriptions are updatable, not live.** The built-in library and the downloadable code pack are maintained with app releases; the app never silently fetches code data in the background.
 - **Web Bluetooth cannot see classic Bluetooth adapters.** Use a BLE ELM327 or a USB serial cable.
 - **Fuel economy** is derived from the ECU fuel-rate PID when available; otherwise estimates are less accurate.
@@ -187,7 +198,7 @@ source of truth: rebuild the APK after changing anything here.
 
 ## Privacy
 
-All data — vehicles, trips, dashboards, results and settings — stays in the browser's local storage. Nothing is uploaded. Backups are files you create and control. The app has no analytics, accounts or network calls other than loading its own static files.
+All data — vehicles, trips, dashboards, results and settings — stays in the browser's local storage. Backups are files you create and control. The app has no analytics and no account system. It loads its own static files, and the only external requests are the optional VIN decode and safety-recall lookups you trigger: the VIN or make/model/year is sent to the official NHTSA public services, and nothing else leaves the device.
 
 ---
 
