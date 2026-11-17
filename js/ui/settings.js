@@ -1,7 +1,7 @@
 /* AutoPulse OBD2 — settings and connection setup */
 
 import {
-  getState, setState, resetState, exportState, importState, activeVehicle,
+  getState, setState, resetState, exportState, importState, activeVehicle, forgetConnection,
 } from '../core/store.js';
 import { PIDS } from '../data/pids.js';
 import { BAUD_RATES, PROTOCOLS } from '../data/vehicles.js';
@@ -64,6 +64,10 @@ export const render = (view) => {
     const bluetooth = isBluetoothSupported();
     const connected = connection.status === 'connected';
     const installable = Boolean(window.__apInstallPrompt);
+    const last = s.lastConnection;
+    const lastText = last
+      ? `${last.name || (last.mode === 'serial' ? 'USB adapter' : 'Bluetooth adapter')} · ${last.mode === 'serial' ? `${last.baudRate} baud` : 'Bluetooth'}`
+      : '';
     const lib = dtcLibraryInfo();
     const counts = {
       vehicles: s.vehicles.length,
@@ -89,11 +93,18 @@ export const render = (view) => {
                 <button class="btn btn-xs" id="setConnectBluetooth" type="button" ${bluetooth ? '' : 'disabled title="Web Bluetooth is not supported in this browser"'}>${icon('bluetooth')}<span>Bluetooth</span></button>
                 ${connected ? `<button class="btn btn-xs btn-ghost" id="setDisconnect" type="button">${icon('power')}<span>Disconnect</span></button>` : ''}
               </div>`)}
+            ${last ? row('Last adapter', escapeHtml(lastText), `
+              <div class="row" style="gap:5px;flex-wrap:wrap;justify-content:flex-end">
+                <button class="btn btn-xs btn-primary" id="setReconnectBtn" type="button">${icon('refresh')}<span>Reconnect</span></button>
+                <button class="btn btn-xs btn-ghost" id="setForgetBtn" type="button" title="Forget the saved adapter">${icon('trash')}</button>
+              </div>`) : ''}
+            ${row('Auto-reconnect', 'Try the last adapter automatically when the app opens, and retry briefly if the link drops. The adapter must be powered and in range.', `
+              <label class="switch"><input type="checkbox" data-setting="autoReconnect" ${settings.autoReconnect ? 'checked' : ''} /><span class="track"></span></label>`)}
             ${row('Poll rate', 'How often live values are requested. Lower is faster but can overwhelm slow adapters.', `
               <select data-setting="pollRate" style="min-width:140px">
                 ${[100, 250, 500, 1000].map((ms) => `<option value="${ms}" ${Number(settings.pollRate) === ms ? 'selected' : ''}>${ms} ms</option>`).join('')}
               </select>`)}
-            ${row('Serial baud rate', 'Most ELM327 USB cables use 38400. Some clones use 9600 or 115200.', `
+            ${row('Serial baud rate', 'Most ELM327 USB cables use 38400. Some clones use 9600 or 115200; AutoPulse tries these automatically.', `
               <select data-setting="serialBaud" style="min-width:140px">
                 ${BAUD_RATES.map((b) => `<option value="${b}" ${Number(settings.serialBaud) === b ? 'selected' : ''}>${b}</option>`).join('')}
               </select>`)}
@@ -102,7 +113,7 @@ export const render = (view) => {
                 <option value="auto" ${settings.adapterProtocol === 'auto' ? 'selected' : ''}>Auto (recommended)</option>
                 ${PROTOCOLS.filter((p) => p !== 'Auto').map((p) => `<option value="${escapeHtml(p)}" ${settings.adapterProtocol === p ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}
               </select>`)}
-            ${row('Auto-connect demo', 'Load the simulated vehicle automatically when the app starts.', `
+            ${row('Open demo on launch', 'Start the offline simulator automatically when the app opens. Off by default so the app waits for your real adapter.', `
               <label class="switch"><input type="checkbox" data-setting="autoConnectDemo" ${settings.autoConnectDemo ? 'checked' : ''} /><span class="track"></span></label>`)}
           `)}
 
@@ -179,7 +190,7 @@ export const render = (view) => {
           ${group('About', `
             <div class="settings-row">
               <div class="sr-text">
-                <b>AutoPulse OBD2 v1.4.0</b>
+                <b>AutoPulse OBD2 v1.5.0</b>
                 <span>Independent offline-capable OBD-II diagnostics PWA. Not affiliated with Car Scanner, ELM Electronics or any vehicle manufacturer.</span>
               </div>
               <div class="sr-control"><span class="chip accent">PWA</span></div>
@@ -209,6 +220,27 @@ export const render = (view) => {
     view.querySelector('#setConnectDemo')?.addEventListener('click', () => connect('demo', build));
     view.querySelector('#setConnectSerial')?.addEventListener('click', () => connect('serial', build));
     view.querySelector('#setConnectBluetooth')?.addEventListener('click', () => connect('bluetooth', build));
+    view.querySelector('#setReconnectBtn')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        await connection.connectSaved(getState().lastConnection);
+        toast('Adapter connected', { message: connection.info.adapter, type: 'ok' });
+      } catch (err) {
+        toast('Reconnect failed', {
+          message: err.message || 'Open Connection setup to pair the adapter again.',
+          type: 'err',
+          timeout: 6500,
+        });
+      } finally {
+        build();
+      }
+    });
+    view.querySelector('#setForgetBtn')?.addEventListener('click', () => {
+      forgetConnection();
+      toast('Saved adapter forgotten', { type: 'info' });
+      build();
+    });
     view.querySelector('#setDisconnect')?.addEventListener('click', async () => {
       await connection.disconnect();
       toast('Disconnected', { type: 'info' });
@@ -224,6 +256,8 @@ export const render = (view) => {
         else value = el.value;
         setState((st) => { st.settings[key] = value; });
         if (key === 'pollRate') connection.setPollRate(value);
+        if (key === 'autoReconnect') connection.setAutoReconnect(value);
+        if (key === 'adapterProtocol') connection.setPreferredProtocol(value);
         if (key === 'units') build();
       });
     });
@@ -329,15 +363,19 @@ export const render = (view) => {
 };
 
 const connect = async (mode, done) => {
+  const protocol = getState().settings.adapterProtocol || 'auto';
   try {
     if (mode === 'demo') {
       await connection.connectDemo(activeVehicle());
       toast('Demo vehicle connected', { message: 'Live data is streaming from the simulator.', type: 'ok' });
     } else if (mode === 'serial') {
-      await connection.connectSerial({ baudRate: Number(getState().settings.serialBaud) });
+      await connection.connectSerial({
+        baudRate: Number(getState().settings.serialBaud),
+        protocol,
+      });
       toast('Serial adapter connected', { message: connection.info.adapter, type: 'ok' });
     } else {
-      await connection.connectBluetooth();
+      await connection.connectBluetooth({ protocol });
       toast('Bluetooth adapter connected', { message: connection.info.adapter, type: 'ok' });
     }
   } catch (err) {
@@ -347,23 +385,53 @@ const connect = async (mode, done) => {
   }
 };
 
+const connectSaved = async () => {
+  try {
+    await connection.connectSaved(getState().lastConnection);
+    toast('Adapter connected', { message: connection.info.adapter, type: 'ok' });
+    return true;
+  } catch (err) {
+    toast('Reconnect failed', {
+      message: err.message || 'Open Connection setup to pair the adapter again.',
+      type: 'err',
+      timeout: 6500,
+    });
+    return false;
+  }
+};
+
 export const openConnectionModal = (onChange) => {
   const serial = isSerialSupported();
   const bluetooth = isBluetoothSupported();
   const connected = connection.status === 'connected';
   const info = connection.info;
+  const last = getState().lastConnection;
+  const lastLabel = last?.name || (last?.mode === 'serial' ? 'USB adapter' : 'Bluetooth adapter');
 
   const api = modal({
     title: 'Connection setup',
-    subtitle: 'Choose the offline demo or connect a real ELM327 adapter.',
+    subtitle: 'Connect a real ELM327 adapter, or open the optional offline demo.',
     wide: true,
     body: `
       <div class="stack">
         <div class="callout">
           ${icon('info')}<div>
-            <b>Demo vehicle</b> runs entirely in this browser with a physics-based drive cycle, temperatures, fuel consumption, DTCs and readiness monitors. It works offline and is the best way to explore every screen.
+            <b>Offline demo</b> runs entirely in this browser with a physics-based drive cycle, temperatures, fuel consumption, DTCs and readiness monitors. It works without an adapter and is a safe way to explore every screen.
           </div>
         </div>
+
+        ${last ? `<div class="settings-group">
+          <h3>Last adapter</h3>
+          <div class="settings-row">
+            <div class="sr-text">
+              <b>${escapeHtml(lastLabel)}</b>
+              <span>${last.mode === 'serial' ? `USB serial · ${escapeHtml(String(last.baudRate || 38400))} baud` : 'Bluetooth LE'} · saved for one-tap reconnect</span>
+            </div>
+            <div class="sr-control">
+              <button class="btn btn-sm btn-primary" id="connReconnectBtn" type="button">${icon('refresh')}<span>Reconnect</span></button>
+            </div>
+          </div>
+        </div>` : ''}
 
         <div class="settings-group">
           <h3>Offline demo</h3>
@@ -383,7 +451,7 @@ export const openConnectionModal = (onChange) => {
           <div class="settings-row">
             <div class="sr-text">
               <b>USB serial ELM327</b>
-              <span>${serial ? 'Web Serial is available. Use Chrome or Edge on desktop with a USB OBD-II cable.' : 'Web Serial is not available in this browser. Use Chrome or Edge on desktop.'}</span>
+              <span>${serial ? 'Web Serial is available. Use Chrome or Edge on desktop with a USB OBD-II cable. Common clone baud rates are tried automatically.' : 'Web Serial is not available in this browser. Use Chrome or Edge on desktop.'}</span>
             </div>
             <div class="sr-control">
               <button class="btn btn-sm" id="connSerialBtn" type="button" ${serial ? '' : 'disabled'}>${icon('usb')}<span>Connect USB</span></button>
@@ -420,6 +488,10 @@ export const openConnectionModal = (onChange) => {
         m.close();
         if (onChange) onChange();
       };
+      m.body.querySelector('#connReconnectBtn')?.addEventListener('click', async () => {
+        await connectSaved();
+        finish();
+      });
       m.body.querySelector('#connDemoBtn')?.addEventListener('click', async () => {
         await connect('demo');
         finish();

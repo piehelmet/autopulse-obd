@@ -15,6 +15,19 @@ const cleanResponse = (raw = '') =>
     .filter(Boolean)
     .join('\n');
 
+/* ELM327 protocol numbers used by ATSP. The settings screen stores the
+ * human-readable label, so map it back to the adapter command. */
+const PROTOCOL_CODES = {
+  'ISO 15765-4 CAN (11-bit, 500 kbps)': '6',
+  'ISO 15765-4 CAN (29-bit, 500 kbps)': '7',
+  'ISO 9141-2': '3',
+  'ISO 14230-4 KWP (5 baud)': '4',
+  'ISO 14230-4 KWP (fast)': '5',
+  'SAE J1850 PWM': '1',
+  'SAE J1850 VPW': '2',
+};
+const protocolCommand = (pref) => `ATSP${PROTOCOL_CODES[pref] || '0'}`;
+
 class Elm327 {
   constructor(transport, log) {
     this.transport = transport;
@@ -22,6 +35,7 @@ class Elm327 {
     this.adapter = 'ELM327';
     this.protocol = 'Auto';
     this.firmware = 'Unknown';
+    this.protocolPref = 'auto';
   }
 
   async command(cmd, timeout = 5000) {
@@ -41,19 +55,43 @@ class Elm327 {
     }
   }
 
-  async init() {
-    const z = await this.tryCommand('ATZ', 7000);
+  async applyDefaults(timeout = 2500) {
+    for (const cmd of ['ATE0', 'ATL0', 'ATS0', 'ATH0', 'ATAT1', protocolCommand(this.protocolPref)]) {
+      await this.tryCommand(cmd, timeout);
+    }
+  }
+
+  async handshake(quick = false) {
+    let test = '';
+    const attempts = quick ? 1 : 3;
+    for (let i = 0; i < attempts; i += 1) {
+      test = await this.tryCommand('0100', quick ? 1500 : 4000);
+      if (/[0-9A-F]{2}/i.test(test) || /NO DATA|UNABLE/i.test(test)) return test;
+      if (i + 1 < attempts) await sleep(450);
+    }
+    return test;
+  }
+
+  async init(protocol = 'auto', { probeTimeout = 7000 } = {}) {
+    this.protocolPref = protocol || 'auto';
+    const quick = probeTimeout <= 2500;
+    let z = await this.tryCommand('ATZ', probeTimeout);
+    if (!z) {
+      if (quick) throw new Error('Adapter did not respond at this baud rate');
+      await sleep(400);
+      z = await this.tryCommand('ATZ', probeTimeout);
+      if (!z) throw new Error('Adapter did not respond. Check the cable and ignition.');
+    }
     this.firmware = (z.match(/ELM\s?327[^\n]*/i) || ['ELM327'])[0].trim();
     await sleep(120);
-    for (const cmd of ['ATE0', 'ATL0', 'ATS0', 'ATH0', 'ATAT1', 'ATSP0']) {
-      await this.tryCommand(cmd, 2500);
-    }
-    const id = await this.tryCommand('ATI', 2500);
+    await this.applyDefaults(quick ? 900 : 2500);
+    const id = await this.tryCommand('ATI', quick ? 900 : 2500);
     if (id && !/ELM|OBD/i.test(id)) this.adapter = id.split('\n')[0].slice(0, 40);
     else this.adapter = this.firmware || 'ELM327';
-    const dp = await this.tryCommand('ATDP', 2500);
+    const dp = await this.tryCommand('ATDP', quick ? 900 : 2500);
     if (dp && !/^OK$/i.test(dp)) this.protocol = dp.split('\n')[0];
-    const test = await this.tryCommand('0100', 6000);
+    else this.protocol = protocol === 'auto' ? 'Auto' : protocol;
+    const test = await this.handshake(quick);
     if (!/[0-9A-F]{2}/i.test(test) && !/NO DATA|UNABLE/i.test(test)) {
       throw new Error('Adapter did not answer the OBD-II handshake. Check ignition and connection.');
     }
@@ -65,13 +103,11 @@ class Elm327 {
   async restoreDefaults() {
     await this.tryCommand('ATD', 3000);
     await sleep(150);
-    for (const cmd of ['ATE0', 'ATL0', 'ATS0', 'ATH0', 'ATAT1', 'ATSP0']) {
-      await this.tryCommand(cmd, 2000);
-    }
+    await this.applyDefaults(2000);
   }
 
   async readPid(pid) {
-    const res = await this.command(`${pid.mode}${pid.pid}`, 4000);
+    const res = await this.command(`${pid.mode}${pid.pid}`, 2500);
     if (/NO DATA|UNABLE|ERROR|STOPPED|\?/i.test(res)) throw new Error('PID not supported');
     const bytes = parseHex(res);
     const isMode22 = pid.mode === '22';
@@ -185,7 +221,7 @@ class Elm327 {
 
 export class ObdConnection {
   constructor() {
-    this.mode = 'demo';
+    this.mode = null;
     this.status = 'disconnected';
     this.values = {};
     this.lastUpdate = 0;
@@ -200,10 +236,19 @@ export class ObdConnection {
     this.cursor = 0;
     this.busy = false;
     this.paused = false;
-    this.info = { adapter: 'Simulated ELM327', firmware: 'v1.5 (demo)', protocol: 'ISO 15765-4 CAN 11/500 (demo)' };
+    this.info = { adapter: 'No adapter', firmware: '—', protocol: 'Auto' };
     this.vehicle = null;
     this.handlers = new Map();
     this.lastDtcs = [];
+    this.protocolPref = 'auto';
+    this.autoReconnect = true;
+    this.lastLink = null;
+    this.reconnecting = false;
+    this.reconnectTimer = null;
+    this.userDisconnect = false;
+    /* PIDs the ECU rejected. Retrying them every tick makes a slow clone
+     * adapter look frozen, so skip them for a cooldown instead. */
+    this.unsupported = new Map();
   }
 
   on(event, fn) {
@@ -233,6 +278,28 @@ export class ObdConnection {
     if (this.sim) this.sim.setVehicle(vehicle);
   }
 
+  setAutoReconnect(on) {
+    this.autoReconnect = Boolean(on);
+    if (!this.autoReconnect) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+      this.reconnecting = false;
+    }
+  }
+
+  setPreferredProtocol(pref) {
+    this.protocolPref = pref || 'auto';
+  }
+
+  getLink() {
+    return this.lastLink ? { ...this.lastLink } : null;
+  }
+
+  attachTransport(transport) {
+    if (!transport) return;
+    transport.onClose = () => this.handleLinkLost();
+  }
+
   setPollRate(ms) {
     this.pollRate = Math.max(80, Number(ms) || 250);
   }
@@ -260,10 +327,15 @@ export class ObdConnection {
     const valid = keys.filter((k) => PIDS_BY_KEY[k] || this.extraPids.has(k));
     this.pollKeys = valid.length ? valid : [...CORE_KEYS];
     this.cursor = 0;
+    this.unsupported.clear();
   }
 
   async connectDemo(vehicle) {
-    await this.disconnect();
+    this.userDisconnect = false;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.reconnecting = false;
+    await this.disconnect({ user: false });
     this.mode = 'demo';
     this.vehicle = vehicle;
     this.setStatus('connecting');
@@ -281,66 +353,189 @@ export class ObdConnection {
     this.scheduleTick();
   }
 
-  async connectSerial({ baudRate = 38400 } = {}) {
-    await this.disconnect();
+  async connectSerial({ baudRate = 38400, auto = false, protocol = this.protocolPref } = {}) {
+    this.userDisconnect = false;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.reconnecting = false;
+    await this.disconnect({ user: false });
     this.mode = 'serial';
+    this.protocolPref = protocol || 'auto';
     this.setStatus('connecting');
-    this.transport = new SerialTransport();
-    try {
-      await this.transport.connect({ baudRate });
-      this.elm = new Elm327(this.transport, (dir, text) => this.log(dir, text));
-      await this.elm.init();
-      this.info = {
-        adapter: this.elm.adapter,
-        firmware: this.elm.firmware,
-        protocol: this.elm.protocol,
-      };
-      this.setStatus('connected');
-      this.scheduleTick();
-    } catch (err) {
-      this.setStatus('error', err.message || 'Serial connection failed');
-      try { await this.transport?.disconnect(); } catch { /* ignore */ }
-      this.transport = null;
-      throw err;
+    this.info = {
+      adapter: 'USB / serial ELM327',
+      firmware: 'Connecting…',
+      protocol: this.protocolPref === 'auto' ? 'Auto' : this.protocolPref,
+    };
+
+    // A wrong baud rate produces silence rather than an error, so try the
+    // common clone rates as a fallback. The port is requested once from the
+    // user gesture and then reused for each probe.
+    const rates = [...new Set([baudRate, 9600, 115200, 38400])];
+    let port = auto ? await new SerialTransport().grantedPort() : null;
+    if (auto && !port) {
+      this.setStatus('error', 'No previously approved USB adapter was found. Connect it once from Connection setup.');
+      throw new Error('No previously approved USB adapter was found. Connect it once from Connection setup.');
     }
+    let lastErr = null;
+
+    for (let i = 0; i < rates.length; i += 1) {
+      const rate = rates[i];
+      const transport = new SerialTransport();
+      try {
+        if (!port) port = await navigator.serial.requestPort();
+        await transport.connect({ baudRate: rate, port });
+        const elm = new Elm327(transport, (dir, text) => this.log(dir, text));
+        await elm.init(this.protocolPref, { probeTimeout: i === 0 ? 7000 : 2200 });
+        this.transport = transport;
+        this.elm = elm;
+        this.info = {
+          adapter: elm.adapter || 'USB / serial ELM327',
+          firmware: elm.firmware,
+          protocol: elm.protocol,
+        };
+        this.lastLink = {
+          mode: 'serial',
+          baudRate: rate,
+          name: transport.name,
+          protocol: this.protocolPref,
+        };
+        this.attachTransport(transport);
+        this.setStatus('connected');
+        this.scheduleTick();
+        return;
+      } catch (err) {
+        lastErr = err;
+        try { await transport.disconnect(); } catch { /* already closed */ }
+      }
+    }
+
+    this.setStatus('error', lastErr?.message || 'Serial connection failed');
+    throw lastErr || new Error('Serial connection failed');
   }
 
-  async connectBluetooth() {
-    await this.disconnect();
+  async connectBluetooth({ deviceId = '', auto = false, protocol = this.protocolPref } = {}) {
+    this.userDisconnect = false;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.reconnecting = false;
+    await this.disconnect({ user: false });
     this.mode = 'bluetooth';
+    this.protocolPref = protocol || 'auto';
     this.setStatus('connecting');
+    this.info = {
+      adapter: auto ? 'Saved Bluetooth adapter' : 'Bluetooth ELM327',
+      firmware: 'Connecting…',
+      protocol: this.protocolPref === 'auto' ? 'Auto' : this.protocolPref,
+    };
     this.transport = new BleTransport();
     try {
-      await this.transport.connect();
+      await this.transport.connect({ deviceId, auto });
       this.elm = new Elm327(this.transport, (dir, text) => this.log(dir, text));
-      await this.elm.init();
+      await this.elm.init(this.protocolPref);
       this.info = {
-        adapter: this.elm.adapter || this.transport.name,
+        adapter: this.transport.name || this.elm.adapter || 'Bluetooth ELM327',
         firmware: this.elm.firmware,
         protocol: this.elm.protocol,
       };
+      this.lastLink = {
+        mode: 'bluetooth',
+        deviceId: this.transport.deviceId || deviceId || '',
+        name: this.transport.name || 'Bluetooth ELM327',
+        protocol: this.protocolPref,
+      };
+      this.attachTransport(this.transport);
       this.setStatus('connected');
       this.scheduleTick();
     } catch (err) {
       this.setStatus('error', err.message || 'Bluetooth connection failed');
-      try { await this.transport?.disconnect(); } catch { /* ignore */ }
+      try { await this.transport?.disconnect(); } catch { /* already closed */ }
       this.transport = null;
       throw err;
     }
   }
 
-  async disconnect() {
+  /* Reconnect using the adapter recorded by the last successful connection. */
+  async connectSaved(link) {
+    if (!link || !link.mode) throw new Error('No saved adapter to reconnect to');
+    if (link.mode === 'bluetooth') {
+      return this.connectBluetooth({
+        deviceId: link.deviceId || '',
+        auto: true,
+        protocol: link.protocol || this.protocolPref,
+      });
+    }
+    if (link.mode === 'serial') {
+      return this.connectSerial({
+        baudRate: link.baudRate || 38400,
+        auto: true,
+        protocol: link.protocol || this.protocolPref,
+      });
+    }
+    throw new Error('The saved connection type is not supported');
+  }
+
+  async disconnect({ user = true } = {}) {
+    this.userDisconnect = user;
+    clearTimeout(this.pollTimer);
+    this.pollTimer = null;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.reconnecting = false;
+    this.busy = false;
+    this.unsupported.clear();
+    this.sim?.stop();
+    this.sim = null;
+    const transport = this.transport;
+    this.transport = null;
+    if (transport) {
+      try { await transport.disconnect(); } catch { /* ignore */ }
+    }
+    this.elm = null;
+    if (this.status !== 'disconnected') this.setStatus('disconnected');
+  }
+
+  /* The transport dropped without the user asking (range, cable, ignition). */
+  handleLinkLost() {
+    if (this.userDisconnect || this.status !== 'connected') return;
+    const link = this.lastLink;
     clearTimeout(this.pollTimer);
     this.pollTimer = null;
     this.busy = false;
     this.sim?.stop();
     this.sim = null;
-    if (this.transport) {
-      try { await this.transport.disconnect(); } catch { /* ignore */ }
-      this.transport = null;
-    }
+    const transport = this.transport;
+    this.transport = null;
     this.elm = null;
-    if (this.status !== 'disconnected') this.setStatus('disconnected');
+    try { transport?.disconnect(); } catch { /* ignore */ }
+    this.setStatus('error', 'Adapter disconnected');
+    if (this.autoReconnect && link) this.scheduleReconnect(link, 1);
+  }
+
+  scheduleReconnect(link, attempt = 1) {
+    if (!this.autoReconnect || this.userDisconnect) return;
+    this.reconnecting = true;
+    clearTimeout(this.reconnectTimer);
+    const delay = Math.min(1200 * attempt, 5000);
+    this.emit('reconnect', { attempt, delay });
+    this.reconnectTimer = setTimeout(async () => {
+      if (!this.autoReconnect || this.userDisconnect) {
+        this.reconnecting = false;
+        return;
+      }
+      try {
+        await this.connectSaved(link);
+        this.reconnecting = false;
+        this.emit('reconnected', { link });
+      } catch {
+        if (attempt < 3 && this.autoReconnect && !this.userDisconnect) {
+          this.scheduleReconnect(link, attempt + 1);
+        } else {
+          this.reconnecting = false;
+          this.setStatus('error', 'Could not reconnect automatically. Tap Connect to try again.');
+        }
+      }
+    }, delay);
   }
 
   scheduleTick() {
@@ -374,15 +569,25 @@ export class ObdConnection {
       } else if (this.elm) {
         const keys = this.pollKeys;
         const batch = Math.min(3, keys.length);
+        const now = Date.now();
         for (let i = 0; i < batch; i += 1) {
           const key = keys[this.cursor % keys.length];
           this.cursor += 1;
           const pid = PIDS_BY_KEY[key] || this.extraPids.get(key);
           if (!pid) continue;
+          const retryAt = this.unsupported.get(key);
+          if (retryAt && retryAt > now) continue;
           try {
             this.values[key] = await this.elm.readPid(pid);
-          } catch {
-            /* unsupported or transient — keep last value */
+            this.unsupported.delete(key);
+          } catch (err) {
+            // Rejections are cached so a clone adapter is not asked for the
+            // same unsupported PID every few hundred milliseconds.
+            const msg = String(err?.message || err).toLowerCase();
+            let cooldown = 8000;
+            if (/not supported|no data|unable|stopped|\?/.test(msg)) cooldown = 60000;
+            else if (/timeout|timed out/.test(msg)) cooldown = 15000;
+            this.unsupported.set(key, Date.now() + cooldown);
           }
         }
         this.lastUpdate = Date.now();

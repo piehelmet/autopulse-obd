@@ -1,6 +1,6 @@
 /* AutoPulse OBD2 — application bootstrap and hash router */
 
-import { getState, subscribe, activeVehicle } from './core/store.js';
+import { getState, subscribe, activeVehicle, rememberConnection } from './core/store.js';
 import { loadBundledDtcPack } from './data/dtc.js';
 import { hydrateIcons } from './core/icons.js';
 import { initTripRecorder } from './core/trips.js';
@@ -62,7 +62,7 @@ const setStatus = () => {
   if (sideAdapter) {
     sideAdapter.textContent = connected
       ? `${connection.info.adapter} · ${connection.info.firmware}`
-      : connection.error || 'Demo available offline';
+      : connection.error || 'No adapter connected';
   }
   if (sideBtn) sideBtn.textContent = connected ? 'Manage connection' : 'Connection setup';
 };
@@ -171,6 +171,8 @@ const bindStore = () => {
   subscribe((state) => {
     applyTheme(state.theme);
     setVehiclePill();
+    connection.setAutoReconnect(state.settings.autoReconnect);
+    connection.setPreferredProtocol(state.settings.adapterProtocol);
     if (state.activeVehicleId !== lastVehicleId) {
       lastVehicleId = state.activeVehicleId;
       connection.setVehicle(activeVehicle());
@@ -187,20 +189,41 @@ const boot = () => {
   initTripRecorder();
 
   connection.setPollRate(getState().settings.pollRate);
+  connection.setAutoReconnect(getState().settings.autoReconnect);
+  connection.setPreferredProtocol(getState().settings.adapterProtocol);
   connection.setVehicle(activeVehicle());
   setVehiclePill();
   setStatus();
-  connection.on('status', setStatus);
+  connection.on('status', (payload) => {
+    setStatus();
+    // Persist the adapter that actually worked so the next launch can offer
+    // a one-tap reconnect instead of another device-picker round trip.
+    if (payload.status === 'connected' && connection.mode !== 'demo') {
+      const link = connection.getLink();
+      if (link) rememberConnection(link);
+    }
+  });
+  connection.on('reconnected', () => {
+    toast('Adapter reconnected', { message: connection.info.adapter, type: 'ok' });
+  });
 
   if (!location.hash) {
     history.replaceState(null, '', '#/dashboard');
   }
   renderRoute();
 
-  if (getState().settings.autoConnectDemo) {
+  const settings = getState().settings;
+  const last = getState().lastConnection;
+  if (settings.autoConnectDemo) {
     connection.connectDemo(activeVehicle()).catch((err) => {
       console.warn('AutoPulse: demo auto-connect failed', err);
       toast('Demo unavailable', { message: err.message, type: 'err' });
+    });
+  } else if (settings.autoReconnect && last) {
+    // Silent best-effort reconnect. If the adapter is off or out of range the
+    // dashboard shows the connect panel rather than an error popup.
+    connection.connectSaved(last).catch((err) => {
+      console.warn('AutoPulse: adapter auto-reconnect failed', err);
     });
   }
 

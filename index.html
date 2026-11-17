@@ -39,13 +39,13 @@
 
       <div class="side-connect">
         <div class="conn-line">
-          <span class="status-dot" id="sideStatusDot"></span>
-          <span id="sideStatusText">Demo vehicle</span>
+          <span class="status-dot off" id="sideStatusDot"></span>
+          <span id="sideStatusText">Disconnected</span>
         </div>
-        <div class="conn-sub" id="sideAdapterText">Simulated ELM327 · 1.5</div>
+        <div class="conn-sub" id="sideAdapterText">No adapter connected</div>
         <button class="btn btn-primary btn-sm btn-block" id="sideConnectBtn" type="button">Connection setup</button>
       </div>
-      <div class="side-foot">AutoPulse v1.4.0 · offline ready</div>
+      <div class="side-foot">AutoPulse v1.5.0 · offline ready</div>
     </aside>
 
     <div class="main-wrap">
@@ -59,10 +59,10 @@
         </div>
         <div class="top-actions">
           <button class="pill" id="vehiclePill" type="button" title="Active vehicle">
-            <span class="ico" data-icon="car"></span><span id="vehiclePillText">Demo car</span>
+            <span class="ico" data-icon="car"></span><span id="vehiclePillText">My vehicle</span>
           </button>
           <button class="pill conn-pill" id="connPill" type="button" title="Connection status">
-            <span class="status-dot" id="topStatusDot"></span><span id="topStatusText">Demo</span>
+            <span class="status-dot off" id="topStatusDot"></span><span id="topStatusText">Offline</span>
           </button>
           <button class="icon-btn" id="hudBtn" type="button" title="HUD mode" aria-label="HUD mode">
             <span class="ico" data-icon="hud"></span>

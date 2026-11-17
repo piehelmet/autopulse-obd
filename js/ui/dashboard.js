@@ -9,6 +9,7 @@ import { icon } from '../core/icons.js';
 import { pageHead, modal, toast, confirmDialog, emptyState, field } from './components.js';
 import { drawGauge, drawLineChart, palette } from './charts.js';
 import { connection } from '../obd/connection.js';
+import { openConnectionModal } from './settings.js';
 import { escapeHtml, uid, clamp } from '../core/utils.js';
 
 const COLORS = () => {
@@ -62,13 +63,37 @@ export const render = (view) => {
     const vehicle = activeVehicle();
     const dash = s.dashboards.find((d) => d.id === s.activeDashboardId) || s.dashboards[0];
     const u = units();
+    const connected = connection.status === 'connected';
+    const demoMode = connected && connection.mode === 'demo';
+    const connecting = connection.status === 'connecting';
+    const last = s.lastConnection;
+    const lastLabel = last?.name || (last?.mode === 'serial' ? 'USB adapter' : 'Bluetooth adapter');
 
     view.innerHTML = `
       ${pageHead('Dashboard', `Live telemetry · ${vehicle.name}`, `
-        <button class="btn btn-sm" id="dashDemoBtn" type="button">${icon('sliders')}<span>Demo drive</span></button>
+        ${connected
+          ? (demoMode ? `<button class="btn btn-sm" id="dashDemoBtn" type="button">${icon('sliders')}<span>Demo drive</span></button>` : '')
+          : `<button class="btn btn-sm btn-primary" data-connect type="button">${icon('link')}<span>Connect</span></button>`}
         <button class="btn btn-sm" id="dashPageBtn" type="button">${icon('plus')}<span>Page</span></button>
         <button class="btn btn-sm btn-primary" id="dashAddBtn" type="button">${icon('plus')}<span>Widget</span></button>
       `)}
+      ${connected ? '' : `
+        <div class="connect-hero${connection.status === 'error' ? ' err' : ''}">
+          <div class="ch-ico">${icon(connecting ? 'refresh' : 'link')}</div>
+          <div class="ch-body">
+            <b>${connecting ? 'Connecting to your adapter…' : connection.status === 'error' ? 'Adapter not connected' : 'Connect your vehicle'}</b>
+            <span>${connecting
+              ? 'Keep the ignition on and the adapter in range. This usually takes a few seconds.'
+              : escapeHtml(connection.error || (last
+                ? `Last used: ${lastLabel}. Reconnect with one tap, or set up a different adapter.`
+                : 'Pair your ELM327 over Bluetooth or plug in a USB cable to see live data. The demo is optional.'))}</span>
+            <div class="ch-actions">
+              <button class="btn btn-sm btn-primary" data-connect type="button">${icon('link')}<span>Connection setup</span></button>
+              ${last && !connecting ? `<button class="btn btn-sm" data-reconnect type="button">${icon('refresh')}<span>Reconnect ${escapeHtml(lastLabel)}</span></button>` : ''}
+              ${!connecting ? `<button class="btn btn-sm btn-ghost" data-demo type="button">${icon('play')}<span>Try demo</span></button>` : ''}
+            </div>
+          </div>
+        </div>`}
       <div class="grid grid-4" style="margin-bottom:14px">
         <div class="kpi">
           <div class="k-label">${icon('map')} Estimated range</div>
@@ -130,6 +155,41 @@ export const render = (view) => {
     root.querySelector('#dashDelPage')?.addEventListener('click', () => deletePage(dash, refresh));
     root.querySelector('#dashDemoBtn')?.addEventListener('click', openDemoControls);
 
+    root.querySelectorAll('[data-connect]').forEach((btn) => {
+      btn.addEventListener('click', () => openConnectionModal(refresh));
+    });
+
+    root.querySelectorAll('[data-demo]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await connection.connectDemo(activeVehicle());
+          toast('Demo vehicle connected', { message: 'Live data is streaming from the simulator.', type: 'ok' });
+        } catch (err) {
+          toast('Demo failed', { message: err.message || 'The simulator could not start.', type: 'err' });
+        } finally {
+          refresh();
+        }
+      });
+    });
+
+    root.querySelector('[data-reconnect]')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        await connection.connectSaved(getState().lastConnection);
+        toast('Adapter connected', { message: connection.info.adapter, type: 'ok' });
+      } catch (err) {
+        toast('Reconnect failed', {
+          message: err.message || 'Open connection setup to pair the adapter again.',
+          type: 'err',
+          timeout: 6500,
+        });
+      } finally {
+        refresh();
+      }
+    });
+
     root.querySelectorAll('#dashPages [data-page]').forEach((btn) => {
       btn.addEventListener('click', () => {
         setState((st) => { st.activeDashboardId = btn.dataset.page; });
@@ -168,7 +228,15 @@ export const render = (view) => {
   window.addEventListener('autopulse:resize', onResize);
 
   const unsubData = connection.on('data', (values) => updateValues(values));
+  let lastStatus = connection.status;
   const unsubStatus = connection.on('status', () => {
+    // Rebuild when the connection state changes so the connect panel and
+    // header actions appear/disappear immediately.
+    if (connection.status !== lastStatus) {
+      lastStatus = connection.status;
+      build();
+      return;
+    }
     const pill = document.getElementById('topStatusText');
     if (pill) updateValues(connection.values);
   });

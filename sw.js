@@ -1,6 +1,6 @@
 /* AutoPulse OBD2 — offline service worker */
 
-const CACHE = 'autopulse-obd-v1.4.0';
+const CACHE = 'autopulse-obd-v1.5.0';
 const ASSETS = [
   './',
   './index.html',

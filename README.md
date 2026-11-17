@@ -14,7 +14,7 @@ Open **<https://piehelmet.github.io/autopulse-obd/>** in Chrome or Edge. Install
 
 ### Install the Android APK
 
-Download **[AutoPulse-OBD2-1.4.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.4.0/AutoPulse-OBD2-1.4.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser or file manager when prompted.
+Download **[AutoPulse-OBD2-1.5.0.apk](https://github.com/piehelmet/autopulse-obd/releases/download/v1.5.0/AutoPulse-OBD2-1.5.0.apk)** and open it on an Android 7.0+ phone. Allow installs from your browser or file manager when prompted.
 
 The APK is a self-contained native app. Every asset is bundled inside it, so it works with no internet connection at all — even on first launch. It does **not** use the Chrome app, has no URL bar, and does not depend on GitHub Pages being reachable. Bluetooth ELM327 adapters are reached through the Android Bluetooth LE stack directly.
 
@@ -38,6 +38,8 @@ Open <http://localhost:8080>. Service workers, Web Bluetooth and Web Serial all 
 3. Open **Connection setup** in the sidebar or top bar.
 4. Choose **Connect USB** (desktop browser) or **Connect Bluetooth**.
 5. Select the adapter in the picker. AutoPulse runs the ELM327 handshake and starts polling.
+
+The app does **not** start the demo automatically. It opens disconnected, shows a connection panel on the dashboard, and tries the last real adapter once if **Auto-reconnect** is enabled. USB reconnects reuse the port you already approved and fall back through common clone baud rates; Bluetooth reconnects use the saved device. If the link drops while driving, AutoPulse retries briefly and then shows the reconnect panel. The offline demo remains available from **Try demo** or Settings → Connect → Demo.
 
 How the Bluetooth picker appears depends on where you run the app:
 

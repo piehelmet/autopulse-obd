@@ -56,6 +56,16 @@ class BaseTransport {
     this.idleTimer = null;
     this.idleMs = 220;
     this.connected = false;
+    this.onClose = null;
+    this.closeNotified = false;
+  }
+
+  /* Called when the link drops on its own (cable pulled, adapter powered off,
+   * Bluetooth out of range). Intentional disconnects do not notify. */
+  notifyClosed(reason = 'closed') {
+    if (this.closeNotified) return;
+    this.closeNotified = true;
+    try { this.onClose?.(reason); } catch { /* handler must not break teardown */ }
   }
 
   push(chunk) {
@@ -110,6 +120,7 @@ class BaseTransport {
 
   async disconnect() {
     this.connected = false;
+    this.closeNotified = true;
     clearTimeout(this.idleTimer);
     this.waiters.forEach((w) => {
       clearTimeout(w.timer);
@@ -129,11 +140,24 @@ export class SerialTransport extends BaseTransport {
     this.reading = false;
   }
 
-  async connect({ baudRate = 38400 } = {}) {
+  /* Ports the user already approved for this origin. Chrome exposes these
+   * without a fresh user gesture, which makes reconnect possible. */
+  async grantedPort() {
+    if (!navigator.serial?.getPorts) return null;
+    try {
+      const ports = await navigator.serial.getPorts();
+      return ports[0] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async connect({ baudRate = 38400, port = null } = {}) {
     if (!isSerialSupported()) throw new Error('Web Serial is not supported in this browser. Use Chrome or Edge on desktop.');
-    this.port = await navigator.serial.requestPort();
+    this.port = port || await navigator.serial.requestPort();
     await this.port.open({ baudRate, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
     this.connected = true;
+    this.closeNotified = false;
     this.reading = true;
     this.name = 'USB / serial ELM327';
     this.readLoop();
@@ -156,6 +180,11 @@ export class SerialTransport extends BaseTransport {
       }
       if (!this.reading) break;
       await new Promise((r) => setTimeout(r, 120));
+    }
+    if (this.reading) {
+      this.reading = false;
+      this.connected = false;
+      this.notifyClosed('serial');
     }
   }
 
@@ -197,24 +226,46 @@ export class BleTransport extends BaseTransport {
     };
   }
 
-  async connect() {
-    if (isNativeApp()) return this.connectNative();
+  async connect({ deviceId = '', auto = false } = {}) {
+    if (isNativeApp()) return this.connectNative({ deviceId, auto });
     if (!isBluetoothSupported()) {
       throw new Error('Web Bluetooth is not supported in this browser. Use Chrome or Edge over HTTPS or localhost.');
     }
-    this.device = await navigator.bluetooth.requestDevice({
-      filters: [
-        { services: [0xffe0] },
-        { services: [0xfff0] },
-        { namePrefix: 'OBD' },
-        { namePrefix: 'ELM' },
-        { namePrefix: 'Vgate' },
-        { namePrefix: 'V-Link' },
-        { namePrefix: 'KONNWEI' },
-      ],
-      optionalServices: BLE_OPTIONAL,
-    });
-    this.name = this.device.name || 'Bluetooth ELM327';
+    let device = null;
+    if (auto) {
+      const devices = navigator.bluetooth.getDevices
+        ? await navigator.bluetooth.getDevices().catch(() => [])
+        : [];
+      device = devices.find((d) => !deviceId || d.id === deviceId) || null;
+      if (!device) throw new Error('The saved adapter is not available. Open connection setup and pair it again.');
+    } else {
+      device = await navigator.bluetooth.requestDevice({
+        filters: [
+          { services: [0xffe0] },
+          { services: [0xfff0] },
+          { namePrefix: 'OBD' },
+          { namePrefix: 'ELM' },
+          { namePrefix: 'Vgate' },
+          { namePrefix: 'V-Link' },
+          { namePrefix: 'KONNWEI' },
+        ],
+        optionalServices: BLE_OPTIONAL,
+      });
+    }
+    await this.connectWeb(device);
+  }
+
+  async connectWeb(device) {
+    this.device = device;
+    this.deviceId = device.id || '';
+    this.name = device.name || 'Bluetooth ELM327';
+    this.closeNotified = false;
+    this.gattHandler = () => {
+      if (!this.connected) return;
+      this.connected = false;
+      this.notifyClosed('bluetooth');
+    };
+    device.addEventListener?.('gattserverdisconnected', this.gattHandler);
     this.server = await this.device.gatt.connect();
 
     let service = null;
@@ -244,7 +295,7 @@ export class BleTransport extends BaseTransport {
 
   /* Native Android path: talks to the BLE stack through Capacitor, so the app
    * does not need Chrome, Web Bluetooth or an internet connection. */
-  async connectNative() {
+  async connectNative({ deviceId = '', auto = false } = {}) {
     const ble = await loadNativeBle();
     this.native = ble;
 
@@ -258,20 +309,40 @@ export class BleTransport extends BaseTransport {
       if (!(await ble.isEnabled())) throw new Error('Bluetooth is turned off. Turn Bluetooth on and try again.');
     }
 
-    let device;
-    try {
-      device = await ble.requestDevice({ optionalServices: BLE_OPTIONAL.map(toFullUuid) });
-    } catch (err) {
-      throw new Error(err?.message || 'No Bluetooth adapter was selected');
+    let device = null;
+    if (deviceId) {
+      device = { deviceId, name: '' };
+      // Prefer the bonded-device entry so the friendly name survives reconnects.
+      if (typeof ble.getBondedDevices === 'function') {
+        try {
+          const bonded = await ble.getBondedDevices();
+          const match = bonded?.find((d) => d.deviceId === deviceId);
+          if (match) device = match;
+        } catch { /* permission or platform may not expose the bonded list */ }
+      }
+    } else {
+      try {
+        device = await ble.requestDevice({ optionalServices: BLE_OPTIONAL.map(toFullUuid) });
+      } catch (err) {
+        throw new Error(err?.message || 'No Bluetooth adapter was selected');
+      }
     }
     this.deviceId = device.deviceId;
     this.name = device.name || device.localName || 'Bluetooth ELM327';
+    this.closeNotified = false;
 
-    await ble.connect(this.deviceId, () => {
-      if (!this.connected) return;
-      this.connected = false;
-      this.push('\nNO DATA\n');
-    });
+    try {
+      await ble.connect(this.deviceId, () => {
+        if (!this.connected) return;
+        this.connected = false;
+        this.notifyClosed('bluetooth');
+      }, { timeout: 20000 });
+    } catch (err) {
+      if (auto) {
+        throw new Error('The saved adapter did not respond. Make sure it is powered and in range, then open connection setup to pair it again.');
+      }
+      throw err;
+    }
 
     const services = await ble.getServices(this.deviceId);
     const service = pickService(services);
@@ -337,10 +408,13 @@ export class BleTransport extends BaseTransport {
         await this.notifyChar.stopNotifications();
       }
     } catch { /* ignore */ }
+    try { this.device?.removeEventListener?.('gattserverdisconnected', this.gattHandler); } catch { /* ignore */ }
     try { this.device?.gatt?.disconnect(); } catch { /* ignore */ }
     this.writeChar = null;
     this.notifyChar = null;
+    this.gattHandler = null;
     this.server = null;
     this.device = null;
+    this.deviceId = null;
   }
 }

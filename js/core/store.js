@@ -3,21 +3,21 @@
 import { uid, debounce } from './utils.js';
 
 const KEY = 'autopulse.state.v1';
-const VERSION = 1;
+const VERSION = 2;
 
-const demoVehicle = () => ({
-  id: 'veh_demo',
-  name: 'Demo Golf',
-  make: 'Volkswagen',
-  model: 'Golf 1.4 TSI',
-  year: 2021,
-  vin: 'WVWZZZAUZMW000001',
-  plate: 'AP-2021',
+const starterVehicle = () => ({
+  id: 'veh_default',
+  name: 'My vehicle',
+  make: '',
+  model: '',
+  year: new Date().getFullYear(),
+  vin: '',
+  plate: '',
   fuel: 'Gasoline',
   tank: 55,
-  odometer: 48210,
+  odometer: 0,
   color: '#28e0b9',
-  notes: 'Simulated vehicle used for the offline demo.',
+  notes: 'Add your car details in the Garage for accurate fuel and trip figures.',
   createdAt: Date.now(),
 });
 
@@ -57,7 +57,8 @@ const defaults = () => ({
   settings: {
     units: 'metric',
     pollRate: 250,
-    autoConnectDemo: true,
+    autoConnectDemo: false,
+    autoReconnect: true,
     autoRecordTrips: false,
     fuelPrice: 1.75,
     currency: '€',
@@ -69,10 +70,11 @@ const defaults = () => ({
     serialBaud: 38400,
     adapterProtocol: 'auto',
   },
-  vehicles: [demoVehicle()],
-  activeVehicleId: 'veh_demo',
+  vehicles: [starterVehicle()],
+  activeVehicleId: 'veh_default',
   dashboards: defaultDashboards(),
   activeDashboardId: 'dash_main',
+  lastConnection: null,
   trips: [],
   perfResults: [],
   serviceHistory: [],
@@ -97,6 +99,17 @@ const load = () => {
     for (const k of ['vehicles', 'dashboards', 'trips', 'perfResults', 'serviceHistory', 'favorites', 'customPids']) {
       if (!Array.isArray(merged[k])) merged[k] = base[k];
     }
+    // v2: the demo is opt-in. Older installs auto-started the simulator, which
+    // made the demo look like the default vehicle.
+    if ((Number(saved.version) || 1) < 2) {
+      merged.settings.autoConnectDemo = false;
+      merged.settings.autoReconnect = true;
+      if (merged.vehicles.length === 1 && merged.vehicles[0].id === 'veh_demo') {
+        merged.vehicles = [starterVehicle()];
+        merged.activeVehicleId = merged.vehicles[0].id;
+      }
+    }
+    merged.version = VERSION;
     if (!merged.vehicles.length) merged.vehicles = base.vehicles;
     if (!merged.dashboards.length) merged.dashboards = base.dashboards;
     if (!merged.vehicles.some((v) => v.id === merged.activeVehicleId)) {
@@ -104,6 +117,9 @@ const load = () => {
     }
     if (!merged.dashboards.some((d) => d.id === merged.activeDashboardId)) {
       merged.activeDashboardId = merged.dashboards[0].id;
+    }
+    if ((Number(saved.version) || 1) < VERSION) {
+      try { localStorage.setItem(KEY, JSON.stringify(merged)); } catch { /* storage may be full */ }
     }
     return merged;
   } catch (err) {
@@ -196,7 +212,7 @@ export const addVehicle = (vehicle) => {
 export const removeVehicle = (id) => {
   setState((s) => {
     s.vehicles = s.vehicles.filter((v) => v.id !== id);
-    if (!s.vehicles.length) s.vehicles = [demoVehicle()];
+    if (!s.vehicles.length) s.vehicles = [starterVehicle()];
     if (s.activeVehicleId === id) s.activeVehicleId = s.vehicles[0].id;
   });
 };
@@ -205,6 +221,26 @@ export const setActiveVehicle = (id) => {
   setState((s) => {
     if (s.vehicles.some((v) => v.id === id)) s.activeVehicleId = id;
   });
+};
+
+/* Remember the last real adapter so the app can offer a one-tap reconnect.
+ * Stored silently: this is infrastructure, not a user-visible state change. */
+export const rememberConnection = (link) => {
+  if (!link || !link.mode) return;
+  setState((s) => {
+    s.lastConnection = {
+      mode: link.mode,
+      deviceId: link.deviceId || '',
+      name: link.name || '',
+      baudRate: link.baudRate || null,
+      protocol: link.protocol || 'auto',
+      at: Date.now(),
+    };
+  }, { silent: true });
+};
+
+export const forgetConnection = () => {
+  setState((s) => { s.lastConnection = null; }, { silent: true });
 };
 
 export const toggleFavorite = (key) => {
